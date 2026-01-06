@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { MentionTextarea } from '@/components/common/MentionTextarea'
 import { ProfileSearchInput } from '@/components/common/ProfileSearchInput'
+import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { SubmitDialog } from './SubmitDialog'
 import { useDraftStore } from '@/stores/draftStore'
 import { useFavoritesStore } from '@/stores/favoritesStore'
@@ -32,6 +33,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [title, setTitle] = useState(draft?.title ?? '')
   const [content, setContent] = useState(draft?.content ?? '')
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023)
+  const [coverImage, setCoverImage] = useState<string | undefined>(draft?.coverImage)
   const [hasChanges, setHasChanges] = useState(false)
   const [publisherSearch, setPublisherSearch] = useState('')
   const [selectedPublisher, setSelectedPublisher] = useState<DraftPublisher | null>(
@@ -65,9 +67,10 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         content: debouncedContent,
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
+        coverImage: isLongForm ? coverImage : undefined,
       })
     }
-  }, [debouncedContent, debouncedTitle, isLongForm, selectedPublisher, currentDraftId, hasChanges, updateDraft])
+  }, [debouncedContent, debouncedTitle, isLongForm, coverImage, selectedPublisher, currentDraftId, hasChanges, updateDraft])
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value)
@@ -81,6 +84,11 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   const handleKindChange = (checked: boolean) => {
     setIsLongForm(checked)
+    setHasChanges(true)
+  }
+
+  const handleCoverImageChange = (url: string | undefined) => {
+    setCoverImage(url)
     setHasChanges(true)
   }
 
@@ -132,6 +140,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       content,
       targetKind: isLongForm ? 30023 : 1,
       targetPublisher: selectedPublisher ?? undefined,
+      coverImage: isLongForm ? coverImage : undefined,
     })
 
     await saveDrafts()
@@ -213,7 +222,8 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               </Button>
               <Button
                 onClick={handleSubmitForReview}
-                disabled={isSubmittedOrPublished}
+                disabled={isSubmittedOrPublished || !selectedPublisher}
+                title={!selectedPublisher ? 'Select a publisher first' : undefined}
               >
                 <Send className="mr-2 h-4 w-4" />
                 Submit for Review
@@ -236,6 +246,14 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 disabled={isSubmittedOrPublished}
               />
             </div>
+          )}
+
+          {isLongForm && (
+            <CoverImageInput
+              value={coverImage}
+              onChange={handleCoverImageChange}
+              disabled={isSubmittedOrPublished}
+            />
           )}
 
           <div className="space-y-2">
@@ -399,25 +417,69 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </p>
           </div>
 
-          {draft.submittedTo && (
+          {(draft.submittedTo || draft.targetPublisher) && isSubmittedOrPublished && (
             <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="font-medium">Submission Info</h3>
-              <p className="text-xs text-muted-foreground">
-                Submitted to:
-              </p>
-              <p className="text-xs font-mono break-all">
-                {draft.submittedTo}
-              </p>
+              <h3 className="font-medium">Submitted To</h3>
+              {draft.targetPublisher ? (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+                  {draft.targetPublisher.picture ? (
+                    <img
+                      src={draft.targetPublisher.picture}
+                      alt=""
+                      className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <User className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {draft.targetPublisher.displayName || draft.targetPublisher.name || formatNpub(draft.targetPublisher.pubkey)}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {draft.targetPublisher.nip05 || formatNpub(draft.targetPublisher.pubkey)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs font-mono break-all">
+                  {draft.submittedTo}
+                </p>
+              )}
             </div>
           )}
 
           {draft.publishedEventId && (
-            <div className="rounded-lg border p-4 space-y-2">
+            <div className="rounded-lg border p-4 space-y-3">
               <h3 className="font-medium">Published</h3>
-              <p className="text-xs text-muted-foreground">Event ID:</p>
-              <p className="text-xs font-mono break-all">
-                {draft.publishedEventId}
-              </p>
+              {draft.targetPublisher && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Published by:</p>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+                    {draft.targetPublisher.picture ? (
+                      <img
+                        src={draft.targetPublisher.picture}
+                        alt=""
+                        className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <User className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className="text-sm truncate">
+                      {draft.targetPublisher.displayName || draft.targetPublisher.name || formatNpub(draft.targetPublisher.pubkey)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Event ID:</p>
+                <p className="text-xs font-mono break-all bg-muted/30 p-2 rounded">
+                  {draft.publishedEventId}
+                </p>
+              </div>
             </div>
           )}
         </div>

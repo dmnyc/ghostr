@@ -5,14 +5,17 @@ import { InboxQueue } from './InboxQueue'
 import { ReviewPane } from './ReviewPane'
 import { HistoryList } from './HistoryList'
 import { DirectPostEditor } from './DirectPostEditor'
+import { EditArticleEditor } from './EditArticleEditor'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSubmissionStore, initializeProcessedIds } from '@/stores/submissionStore'
 import { useAdminInbox } from '@/hooks/useAdminInbox'
+import type { PublishedItem } from '@/stores/publishHistoryStore'
 
 export function PublisherDashboard() {
   const { currentSubmissionId, setCurrentSubmission, isLoading, submissions } = useSubmissionStore()
   const [activeTab, setActiveTab] = useState('inbox')
   const [isCreatingPost, setIsCreatingPost] = useState(false)
+  const [editingArticle, setEditingArticle] = useState<PublishedItem | null>(null)
 
   // Initialize processed IDs from localStorage
   useEffect(() => {
@@ -28,6 +31,10 @@ export function PublisherDashboard() {
 
   if (isCreatingPost) {
     return <DirectPostEditor onBack={() => setIsCreatingPost(false)} />
+  }
+
+  if (editingArticle) {
+    return <EditArticleEditor item={editingArticle} onBack={() => setEditingArticle(null)} />
   }
 
   if (currentSubmissionId) {
@@ -67,7 +74,7 @@ export function PublisherDashboard() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <HistoryList />
+          <HistoryList onEditArticle={setEditingArticle} />
         </TabsContent>
       </Tabs>
     </div>

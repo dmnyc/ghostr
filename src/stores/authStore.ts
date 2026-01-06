@@ -115,8 +115,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       ndk.signer = undefined
     }
 
-    // Clear saved session
+    // Clear saved session and role
     localStorage.removeItem('ghostr-auth-type')
+    sessionStorage.removeItem('ghostr-active-role')
 
     set({
       isAuthenticated: false,

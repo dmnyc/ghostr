@@ -47,6 +47,10 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
   const isProcessed = submission.status !== 'pending'
 
+  // Extract cover image from tags
+  const coverImageTag = submission.tags.find((t) => t[0] === 'image')
+  const coverImage = coverImageTag?.[1]
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -95,6 +99,20 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
       <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
         <div className="rounded-lg border p-4 space-y-4">
+          {/* Cover Image Preview */}
+          {coverImage && (
+            <div className="space-y-2">
+              <Label>Cover Image</Label>
+              <div className="rounded-lg overflow-hidden border">
+                <img
+                  src={coverImage}
+                  alt="Cover"
+                  className="w-full aspect-video object-cover"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Content {!isProcessed && '(Editable)'}</Label>
             <Textarea

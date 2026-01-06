@@ -117,13 +117,20 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
     setIsSubmitting(true)
 
     try {
+      // Build tags array, including cover image if present
+      const tags = [...draft.tags]
+      if (draft.targetKind === 30023 && draft.coverImage) {
+        // Add image tag for long-form articles with cover image
+        tags.push(['image', draft.coverImage])
+      }
+
       const payload: SubmissionPayload = {
         protocol: PROTOCOL_VERSION,
         type: 'submission',
         id: draft.id,
         content: draft.content,
         kind: draft.targetKind,
-        tags: draft.tags,
+        tags,
         note: note.trim(),
       }
 

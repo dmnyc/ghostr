@@ -14,6 +14,7 @@ import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubmissionStore } from '@/stores/submissionStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { usePublishHistoryStore } from '@/stores/publishHistoryStore'
 import { sendGiftWrappedReceipt } from '@/lib/nostr/nip59'
 import type { Submission } from '@/types/submission'
 import type { ReceiptPayload } from '@/types/receipt'
@@ -41,6 +42,7 @@ export function PublishDialog({
   const { signer } = useAuthStore()
   const { markAsApproved, isProcessed } = useSubmissionStore()
   const { creditGhostr } = useSettingsStore()
+  const { addItem } = usePublishHistoryStore()
 
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,9 +71,11 @@ export function PublishDialog({
 
       // Build tags based on kind
       const tags: string[][] = []
+      let dTag: string | undefined
+
       if (submission.kind === 30023) {
         // Long-form article requires a 'd' tag
-        const dTag = `ghostr-${submission.id}`
+        dTag = `ghostr-${submission.id}`
         tags.push(['d', dTag])
         tags.push(...submission.tags.filter((t) => t[0] !== 'd'))
       } else {
@@ -91,6 +95,10 @@ export function PublishDialog({
 
       const publishedEventId = event.id
 
+      // Extract title and cover image from tags for history
+      const titleTag = submission.tags.find((t) => t[0] === 'title')
+      const imageTag = submission.tags.find((t) => t[0] === 'image')
+
       // Send receipt to delegate
       try {
         const receipt: ReceiptPayload = {
@@ -109,6 +117,20 @@ export function PublishDialog({
       }
 
       markAsApproved(submission.id, publishedEventId)
+
+      // Add to publish history
+      addItem({
+        id: publishedEventId,
+        content: editedContent,
+        kind: submission.kind,
+        title: titleTag?.[1],
+        dTag,
+        coverImage: imageTag?.[1],
+        publishedAt: Date.now(),
+        source: 'delegate',
+        delegatePubkey: submission.delegatePubkey,
+        delegateNpub: submission.delegateNpub,
+      })
 
       toast({
         title: 'Published successfully',

@@ -2,33 +2,31 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { usePublishHistoryStore } from '@/stores/publishHistoryStore'
+import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
 import { toast } from '@/hooks/useToast'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
 
-interface DirectPostEditorProps {
+interface EditArticleEditorProps {
+  item: PublishedItem
   onBack: () => void
   onPublished?: () => void
 }
 
-export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps) {
+export function EditArticleEditor({ item, onBack, onPublished }: EditArticleEditorProps) {
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
   const { creditGhostr } = useSettingsStore()
-  const { addItem } = usePublishHistoryStore()
+  const { updateItem } = usePublishHistoryStore()
 
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [isLongForm, setIsLongForm] = useState(false)
-  const [coverImage, setCoverImage] = useState<string | undefined>()
+  const [title, setTitle] = useState(item.title ?? '')
+  const [content, setContent] = useState(item.content)
+  const [coverImage, setCoverImage] = useState<string | undefined>(item.coverImage)
   const [isPublishing, setIsPublishing] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
 
@@ -51,34 +49,32 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       return
     }
 
+    if (!item.dTag) {
+      toast({
+        title: 'Cannot update',
+        description: 'This article cannot be updated (missing identifier).',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsPublishing(true)
 
     try {
       const event = new NDKEvent(ndk)
-      event.kind = isLongForm ? 30023 : 1
+      event.kind = 30023
       event.content = content
 
-      const tags: string[][] = []
-      let dTag: string | undefined
+      // Use the same d-tag to replace the article
+      const tags: string[][] = [
+        ['d', item.dTag],
+        ['title', title],
+        ['published_at', Math.floor(Date.now() / 1000).toString()],
+      ]
 
-      if (isLongForm) {
-        // Add NIP-23 tags for long-form content
-        const slug = title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '')
-
-        dTag = slug || `post-${Date.now()}`
-        tags.push(
-          ['d', dTag],
-          ['title', title],
-          ['published_at', Math.floor(Date.now() / 1000).toString()]
-        )
-
-        // Add cover image tag if set
-        if (coverImage) {
-          tags.push(['image', coverImage])
-        }
+      // Add cover image tag if set
+      if (coverImage) {
+        tags.push(['image', coverImage])
       }
 
       // Add client tag if enabled
@@ -91,27 +87,24 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       await event.sign(signer)
       await event.publish()
 
-      // Add to publish history
-      addItem({
+      // Update history entry
+      updateItem(item.id, {
         id: event.id,
         content,
-        kind: isLongForm ? 30023 : 1,
-        title: isLongForm ? title : undefined,
-        dTag: isLongForm ? dTag : undefined,
-        coverImage: isLongForm ? coverImage : undefined,
+        kind: 30023,
+        title,
+        dTag: item.dTag,
+        coverImage,
         publishedAt: Date.now(),
-        source: 'direct',
+        source: item.source,
+        delegatePubkey: item.delegatePubkey,
+        delegateNpub: item.delegateNpub,
       })
 
       toast({
-        title: 'Published!',
-        description: 'Your post has been published to Nostr.',
+        title: 'Article updated!',
+        description: 'Your article has been republished.',
       })
-
-      // Reset form
-      setTitle('')
-      setContent('')
-      setCoverImage(undefined)
 
       onPublished?.()
       onBack()
@@ -135,9 +128,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">New Post</h1>
+            <h1 className="text-xl font-bold">Edit Article</h1>
             <p className="text-sm text-muted-foreground">
-              Publish directly to Nostr
+              Update and republish this article
             </p>
           </div>
         </div>
@@ -158,49 +151,35 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            {isPublishing ? 'Publishing...' : 'Publish'}
+            {isPublishing ? 'Publishing...' : 'Update Article'}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
         <div className="rounded-lg border p-4 space-y-4">
-          {isLongForm && (
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                placeholder="Enter a title for your article"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-          )}
-
-          {isLongForm && (
-            <CoverImageInput
-              value={coverImage}
-              onChange={setCoverImage}
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              placeholder="Enter a title for your article"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
-          )}
+          </div>
+
+          <CoverImageInput
+            value={coverImage}
+            onChange={setCoverImage}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="content">Content</Label>
-            {isLongForm ? (
-              <MarkdownEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your article here..."
-              />
-            ) : (
-              <Textarea
-                id="content"
-                placeholder="What do you want to say?"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="min-h-[200px]"
-              />
-            )}
+            <MarkdownEditor
+              value={content}
+              onChange={setContent}
+              placeholder="Write your article here..."
+            />
             <p className="text-xs text-muted-foreground">
               {content.length} characters
             </p>
@@ -209,24 +188,25 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-4">
-            <h3 className="font-medium">Post Type</h3>
-            <div className="flex items-center justify-between">
+            <h3 className="font-medium">Article Info</h3>
+            <div className="space-y-2 text-sm">
               <div>
-                <Label htmlFor="kind-toggle">Long-form Article</Label>
-                <p className="text-xs text-muted-foreground">
-                  Kind {isLongForm ? '30023' : '1'}
-                </p>
+                <span className="text-muted-foreground">Identifier:</span>
+                <p className="font-mono text-xs break-all">{item.dTag}</p>
               </div>
-              <Switch
-                id="kind-toggle"
-                checked={isLongForm}
-                onCheckedChange={setIsLongForm}
-              />
+              <div>
+                <span className="text-muted-foreground">Originally published:</span>
+                <p>{new Date(item.publishedAt).toLocaleString()}</p>
+              </div>
+              {item.source === 'delegate' && (
+                <div>
+                  <span className="text-muted-foreground">Source:</span>
+                  <p>From delegate</p>
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {isLongForm
-                ? 'Long-form articles (NIP-23) support markdown and are best for blog posts and articles.'
-                : 'Short notes (Kind 1) are like tweets - brief updates and thoughts.'}
+              Publishing will replace the existing article with the same identifier.
             </p>
           </div>
         </div>

@@ -1,6 +1,10 @@
 export const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
   'wss://nos.lol',
+  'wss://relay.primal.net',
+  'wss://relay.snort.social',
+  'wss://nostr.mom',
+  'wss://relay.nostr.net',
   'wss://purplepag.es',
 ]
 
