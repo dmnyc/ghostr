@@ -1,3 +1,12 @@
+export interface DraftPublisher {
+  pubkey: string
+  npub: string
+  name?: string
+  displayName?: string
+  picture?: string
+  nip05?: string
+}
+
 export interface Draft {
   id: string
   title: string
@@ -6,6 +15,7 @@ export interface Draft {
   tags: string[][]
   status: 'draft' | 'submitted' | 'published' | 'rejected'
   updatedAt: number
+  targetPublisher?: DraftPublisher
   submittedTo?: string
   publishedEventId?: string
   rejectionReason?: string

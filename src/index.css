@@ -175,3 +175,17 @@ body {
   height: auto;
   border-radius: 0.5rem;
 }
+
+/* Ghost floating animation */
+@keyframes ghost-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.ghost-trigger:hover .ghost-float {
+  animation: ghost-float 1.5s ease-in-out infinite;
+}

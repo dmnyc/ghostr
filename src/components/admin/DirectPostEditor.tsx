@@ -26,6 +26,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [content, setContent] = useState('')
   const [isLongForm, setIsLongForm] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [includeCredit, setIncludeCredit] = useState(creditGhostr)
 
   const handlePublish = async () => {
     if (!content.trim()) {
@@ -70,7 +71,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       }
 
       // Add client tag if enabled
-      if (creditGhostr) {
+      if (includeCredit) {
         tags.push(['client', 'Ghostr'])
       }
 
@@ -117,18 +118,29 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           </div>
         </div>
 
-        <Button onClick={handlePublish} disabled={isPublishing}>
-          {isPublishing ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="mr-2 h-4 w-4" />
-          )}
-          {isPublishing ? 'Publishing...' : 'Publish'}
-        </Button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeCredit}
+              onChange={(e) => setIncludeCredit(e.target.checked)}
+              className="rounded border-muted-foreground"
+            />
+            Credit Ghostr
+          </label>
+          <Button onClick={handlePublish} disabled={isPublishing}>
+            {isPublishing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            {isPublishing ? 'Publishing...' : 'Publish'}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_300px]">
-        <div className="space-y-4">
+      <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
+        <div className="rounded-lg border p-4 space-y-4">
           {isLongForm && (
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>

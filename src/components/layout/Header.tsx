@@ -37,12 +37,15 @@ export function Header() {
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <GhostrLogo className="h-12 w-12" />
+        <button
+          onClick={() => setCurrentView('main')}
+          className="ghost-trigger flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
+          <GhostrLogo className="h-12 w-12 ghost-float" />
           <span style={{ fontFamily: '"Press Start 2P", cursive', fontSize: '1.2rem' }}>
             GHOS<span style={{ marginLeft: '-0.15em' }}>TR</span>
           </span>
-        </div>
+        </button>
 
         <div className="flex items-center gap-4">
           <RelayStatus />

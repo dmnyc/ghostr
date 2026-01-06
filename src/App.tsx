@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { initializeTheme } from '@/stores/settingsStore'
 import { Header } from '@/components/layout/Header'
+import { Footer } from '@/components/layout/Footer'
 import { DelegateDashboard } from '@/components/delegate/DelegateDashboard'
 import { PublisherDashboard } from '@/components/admin/PublisherDashboard'
 import { SettingsPage } from '@/components/settings/SettingsPage'
@@ -33,10 +34,10 @@ function App() {
   }, [connectionStatus, restoreSession])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 flex-1">
         {connectionStatus === 'connecting' && (
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Connecting to relays...</div>
@@ -73,6 +74,8 @@ function App() {
           </div>
         )}
       </main>
+
+      <Footer />
 
       <LoginDialog
         open={isLoginModalOpen}

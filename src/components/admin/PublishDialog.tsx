@@ -26,6 +26,7 @@ interface PublishDialogProps {
   submission: Submission
   editedContent: string
   onSuccess: () => void
+  initialCredit?: boolean
 }
 
 export function PublishDialog({
@@ -34,6 +35,7 @@ export function PublishDialog({
   submission,
   editedContent,
   onSuccess,
+  initialCredit,
 }: PublishDialogProps) {
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
@@ -42,6 +44,7 @@ export function PublishDialog({
 
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [includeCredit, setIncludeCredit] = useState(initialCredit ?? creditGhostr)
 
   const handlePublish = async () => {
     if (!ndk || !signer) {
@@ -76,7 +79,7 @@ export function PublishDialog({
       }
 
       // Add client tag if enabled
-      if (creditGhostr) {
+      if (includeCredit) {
         tags.push(['client', 'Ghostr'])
       }
 
@@ -166,18 +169,29 @@ export function PublishDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handlePublish} disabled={isPublishing}>
-            {isPublishing ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="mr-2 h-4 w-4" />
-            )}
-            {isPublishing ? 'Publishing...' : 'Publish'}
-          </Button>
+        <DialogFooter className="flex-col sm:flex-row gap-4">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer mr-auto">
+            <input
+              type="checkbox"
+              checked={includeCredit}
+              onChange={(e) => setIncludeCredit(e.target.checked)}
+              className="rounded border-muted-foreground"
+            />
+            Credit Ghostr
+          </label>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePublish} disabled={isPublishing}>
+              {isPublishing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              )}
+              {isPublishing ? 'Publishing...' : 'Publish'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,6 +1,6 @@
 {
   "name": "ghostr",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Nostr delegation and approval workflow application",
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
     "@nostr-dev-kit/ndk": "^2.18.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",

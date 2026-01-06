@@ -57,7 +57,9 @@ export function SettingsPage() {
     setNewRelayUrl('')
   }
 
-  const isRelayConnected = (url: string) => connectedRelays.includes(url)
+  const normalizeUrl = (url: string) => url.replace(/\/+$/, '')
+  const isRelayConnected = (url: string) =>
+    connectedRelays.some(r => normalizeUrl(r) === normalizeUrl(url))
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -160,17 +162,17 @@ export function SettingsPage() {
                   {nip65Relays.map((relay) => (
                     <div
                       key={relay.url}
-                      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                      className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         {isRelayConnected(relay.url) ? (
-                          <Wifi className="h-4 w-4 text-green-500" />
+                          <Wifi className="h-4 w-4 text-green-500 flex-shrink-0" />
                         ) : (
-                          <WifiOff className="h-4 w-4 text-muted-foreground" />
+                          <WifiOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         )}
-                        <span className="text-sm font-mono">{relay.url}</span>
+                        <span className="text-sm font-mono truncate">{relay.url}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
                         {relay.read && (
                           <span className="flex items-center gap-1">
                             <BookOpen className="h-3 w-3" /> Read
@@ -218,21 +220,21 @@ export function SettingsPage() {
             {relays.map((relay) => (
               <div
                 key={relay.url}
-                className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {isRelayConnected(relay.url) ? (
-                    <Wifi className="h-4 w-4 text-green-500" />
+                    <Wifi className="h-4 w-4 text-green-500 flex-shrink-0" />
                   ) : (
-                    <WifiOff className="h-4 w-4 text-muted-foreground" />
+                    <WifiOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="text-sm font-mono">{relay.url}</span>
+                  <span className="text-sm font-mono truncate">{relay.url}</span>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => removeRelay(relay.url)}
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
