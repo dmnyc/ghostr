@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { initializeTheme } from '@/stores/settingsStore'
 import { Header } from '@/components/layout/Header'
+import { GhostrLogo } from '@/components/common/GhostrLogo'
 import { Footer } from '@/components/layout/Footer'
 import { DelegateDashboard } from '@/components/delegate/DelegateDashboard'
 import { PublisherDashboard } from '@/components/admin/PublisherDashboard'
@@ -46,6 +47,7 @@ function App() {
 
         {connectionStatus === 'connected' && !isAuthenticated && (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <GhostrLogo className="h-24 w-24 ghost-float-always" />
             <h2 className="text-2xl font-semibold">Welcome to Ghostr</h2>
             <p className="text-muted-foreground text-center max-w-md">
               A decentralized content approval workflow for Nostr.

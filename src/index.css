@@ -189,3 +189,7 @@ body {
 .ghost-trigger:hover .ghost-float {
   animation: ghost-float 1.5s ease-in-out infinite;
 }
+
+.ghost-float-always {
+  animation: ghost-float 1.5s ease-in-out infinite;
+}
