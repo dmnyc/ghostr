@@ -50,8 +50,8 @@ function App() {
             <GhostrLogo className="h-24 w-24 ghost-float-always" />
             <h2 className="text-2xl font-semibold">Welcome to Ghostr</h2>
             <p className="text-muted-foreground text-center max-w-md">
-              A decentralized content approval workflow for Nostr.
-              Delegates draft content, Admins review and publish.
+              A decentralized content delegation workflow for Nostr.
+              Writers draft, publishers sign. No scary key sharing required.
             </p>
             <button
               onClick={() => setLoginModalOpen(true)}
