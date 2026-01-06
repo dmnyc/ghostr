@@ -1,0 +1,113 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+type Role = 'delegate' | 'admin'
+type Theme = 'light' | 'dark' | 'system'
+
+interface RelayConfig {
+  url: string
+  read: boolean
+  write: boolean
+}
+
+interface SettingsStore {
+  // User preferences
+  defaultRole: Role
+  theme: Theme
+
+  // Relay configuration
+  relays: RelayConfig[]
+  useNIP65: boolean
+  nip65Relays: RelayConfig[]
+
+  // Actions
+  setDefaultRole: (role: Role) => void
+  setTheme: (theme: Theme) => void
+  setRelays: (relays: RelayConfig[]) => void
+  addRelay: (url: string) => void
+  removeRelay: (url: string) => void
+  setUseNIP65: (use: boolean) => void
+  setNIP65Relays: (relays: RelayConfig[]) => void
+  getActiveRelays: () => RelayConfig[]
+}
+
+const DEFAULT_RELAYS: RelayConfig[] = [
+  { url: 'wss://relay.damus.io', read: true, write: true },
+  { url: 'wss://nos.lol', read: true, write: true },
+  { url: 'wss://relay.nostr.band', read: true, write: true },
+]
+
+export const useSettingsStore = create<SettingsStore>()(
+  persist(
+    (set, get) => ({
+      defaultRole: 'delegate',
+      theme: 'dark',
+      relays: DEFAULT_RELAYS,
+      useNIP65: true,
+      nip65Relays: [],
+
+      setDefaultRole: (role) => set({ defaultRole: role }),
+
+      setTheme: (theme) => {
+        set({ theme })
+        applyTheme(theme)
+      },
+
+      setRelays: (relays) => set({ relays }),
+
+      addRelay: (url) => {
+        const { relays } = get()
+        if (!relays.find((r) => r.url === url)) {
+          set({ relays: [...relays, { url, read: true, write: true }] })
+        }
+      },
+
+      removeRelay: (url) => {
+        const { relays } = get()
+        set({ relays: relays.filter((r) => r.url !== url) })
+      },
+
+      setUseNIP65: (use) => set({ useNIP65: use }),
+
+      setNIP65Relays: (relays) => set({ nip65Relays: relays }),
+
+      getActiveRelays: () => {
+        const { useNIP65, nip65Relays, relays } = get()
+        if (useNIP65 && nip65Relays.length > 0) {
+          return nip65Relays
+        }
+        return relays
+      },
+    }),
+    {
+      name: 'ghostr-settings',
+      partialize: (state) => ({
+        defaultRole: state.defaultRole,
+        theme: state.theme,
+        relays: state.relays,
+        useNIP65: state.useNIP65,
+      }),
+    }
+  )
+)
+
+// Apply theme to document
+export function applyTheme(theme: Theme) {
+  const root = document.documentElement
+  root.classList.remove('light', 'dark')
+
+  if (theme === 'system') {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light'
+    root.classList.add(systemTheme)
+  } else {
+    root.classList.add(theme)
+  }
+}
+
+// Initialize theme on load
+export function initializeTheme() {
+  const theme = useSettingsStore.getState().theme
+  applyTheme(theme)
+}

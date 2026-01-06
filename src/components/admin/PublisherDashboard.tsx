@@ -1,0 +1,75 @@
+import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { InboxQueue } from './InboxQueue'
+import { ReviewPane } from './ReviewPane'
+import { HistoryList } from './HistoryList'
+import { DirectPostEditor } from './DirectPostEditor'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSubmissionStore, initializeProcessedIds } from '@/stores/submissionStore'
+import { useAdminInbox } from '@/hooks/useAdminInbox'
+
+export function PublisherDashboard() {
+  const { currentSubmissionId, setCurrentSubmission, isLoading, submissions } = useSubmissionStore()
+  const [activeTab, setActiveTab] = useState('inbox')
+  const [isCreatingPost, setIsCreatingPost] = useState(false)
+
+  // Initialize processed IDs from localStorage
+  useEffect(() => {
+    initializeProcessedIds()
+  }, [])
+
+  // Subscribe to inbox
+  useAdminInbox()
+
+  const handleBack = () => {
+    setCurrentSubmission(null)
+  }
+
+  if (isCreatingPost) {
+    return <DirectPostEditor onBack={() => setIsCreatingPost(false)} />
+  }
+
+  if (currentSubmissionId) {
+    return <ReviewPane onBack={handleBack} />
+  }
+
+  const pendingCount = submissions.filter((s) => s.status === 'pending').length
+  const historyCount = submissions.filter((s) => s.status === 'approved' || s.status === 'rejected').length
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Publisher Dashboard</h1>
+          <p className="text-muted-foreground">
+            Review and publish content submitted by delegates
+          </p>
+        </div>
+        <Button onClick={() => setIsCreatingPost(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Post
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="inbox">
+            Inbox {pendingCount > 0 && `(${pendingCount})`}
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            History {historyCount > 0 && `(${historyCount})`}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inbox" className="mt-4">
+          <InboxQueue isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <HistoryList />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
