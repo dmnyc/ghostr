@@ -14,6 +14,7 @@ interface SettingsStore {
   // User preferences
   defaultRole: Role
   theme: Theme
+  creditGhostr: boolean
 
   // Relay configuration
   relays: RelayConfig[]
@@ -23,6 +24,7 @@ interface SettingsStore {
   // Actions
   setDefaultRole: (role: Role) => void
   setTheme: (theme: Theme) => void
+  setCreditGhostr: (credit: boolean) => void
   setRelays: (relays: RelayConfig[]) => void
   addRelay: (url: string) => void
   removeRelay: (url: string) => void
@@ -42,6 +44,7 @@ export const useSettingsStore = create<SettingsStore>()(
     (set, get) => ({
       defaultRole: 'delegate',
       theme: 'dark',
+      creditGhostr: true,
       relays: DEFAULT_RELAYS,
       useNIP65: true,
       nip65Relays: [],
@@ -52,6 +55,8 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ theme })
         applyTheme(theme)
       },
+
+      setCreditGhostr: (credit) => set({ creditGhostr: credit }),
 
       setRelays: (relays) => set({ relays }),
 
@@ -84,6 +89,7 @@ export const useSettingsStore = create<SettingsStore>()(
       partialize: (state) => ({
         defaultRole: state.defaultRole,
         theme: state.theme,
+        creditGhostr: state.creditGhostr,
         relays: state.relays,
         useNIP65: state.useNIP65,
       }),

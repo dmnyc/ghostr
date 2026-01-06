@@ -4,10 +4,11 @@ export interface Draft {
   content: string
   targetKind: 1 | 30023
   tags: string[][]
-  status: 'draft' | 'submitted' | 'published'
+  status: 'draft' | 'submitted' | 'published' | 'rejected'
   updatedAt: number
   submittedTo?: string
   publishedEventId?: string
+  rejectionReason?: string
 }
 
 export interface DraftStore {

@@ -17,6 +17,8 @@ export function SettingsPage() {
   const {
     defaultRole,
     setDefaultRole,
+    creditGhostr,
+    setCreditGhostr,
     relays,
     addRelay,
     removeRelay,
@@ -85,6 +87,30 @@ export function SettingsPage() {
             <Switch
               checked={defaultRole === 'admin'}
               onCheckedChange={(checked) => setDefaultRole(checked ? 'admin' : 'delegate')}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Publishing Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Publishing</CardTitle>
+          <CardDescription>
+            Configure how posts are published
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Credit Ghostr in posts</Label>
+              <p className="text-sm text-muted-foreground">
+                Add a "client" tag to published events identifying Ghostr as the publishing app
+              </p>
+            </div>
+            <Switch
+              checked={creditGhostr}
+              onCheckedChange={setCreditGhostr}
             />
           </div>
         </CardContent>

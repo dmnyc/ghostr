@@ -39,7 +39,9 @@ export function Header() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <div className="flex items-center gap-3">
           <GhostrLogo className="h-12 w-12" />
-          <span style={{ fontFamily: '"Press Start 2P", cursive', fontSize: '1.2rem' }}>GHOSTR</span>
+          <span style={{ fontFamily: '"Press Start 2P", cursive', fontSize: '1.2rem' }}>
+            GHOS<span style={{ marginLeft: '-0.15em' }}>TR</span>
+          </span>
         </div>
 
         <div className="flex items-center gap-4">

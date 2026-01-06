@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubmissionStore } from '@/stores/submissionStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { sendGiftWrappedReceipt } from '@/lib/nostr/nip59'
 import type { Submission } from '@/types/submission'
 import type { ReceiptPayload } from '@/types/receipt'
@@ -37,6 +38,7 @@ export function PublishDialog({
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
   const { markAsApproved, isProcessed } = useSubmissionStore()
+  const { creditGhostr } = useSettingsStore()
 
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,17 +64,23 @@ export function PublishDialog({
       event.kind = submission.kind
       event.content = editedContent
 
-      // Add tags based on kind
+      // Build tags based on kind
+      const tags: string[][] = []
       if (submission.kind === 30023) {
         // Long-form article requires a 'd' tag
         const dTag = `ghostr-${submission.id}`
-        event.tags = [
-          ['d', dTag],
-          ...submission.tags.filter((t) => t[0] !== 'd'),
-        ]
+        tags.push(['d', dTag])
+        tags.push(...submission.tags.filter((t) => t[0] !== 'd'))
       } else {
-        event.tags = submission.tags
+        tags.push(...submission.tags)
       }
+
+      // Add client tag if enabled
+      if (creditGhostr) {
+        tags.push(['client', 'Ghostr'])
+      }
+
+      event.tags = tags
 
       // Sign and publish
       await event.sign(signer)

@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DraftList } from './DraftList'
 import { DraftEditor } from './DraftEditor'
 import { DelegateHistoryList } from './DelegateHistoryList'
+import { RejectedList } from './RejectedList'
 import { useDraftStore } from '@/stores/draftStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useDelegateReceipts } from '@/hooks/useDelegateReceipts'
@@ -42,8 +43,9 @@ export function DelegateDashboard() {
     return <DraftEditor onBack={handleBack} />
   }
 
-  const activeDrafts = drafts.filter((d) => d.status !== 'published')
+  const activeDrafts = drafts.filter((d) => d.status === 'draft' || d.status === 'submitted')
   const publishedCount = drafts.filter((d) => d.status === 'published').length
+  const rejectedCount = drafts.filter((d) => d.status === 'rejected').length
 
   return (
     <div className="space-y-6">
@@ -65,7 +67,10 @@ export function DelegateDashboard() {
           <TabsTrigger value="drafts">
             Drafts {activeDrafts.length > 0 && `(${activeDrafts.length})`}
           </TabsTrigger>
-          <TabsTrigger value="history">
+          <TabsTrigger value="rejected">
+            Rejected {rejectedCount > 0 && `(${rejectedCount})`}
+          </TabsTrigger>
+          <TabsTrigger value="published">
             Published {publishedCount > 0 && `(${publishedCount})`}
           </TabsTrigger>
         </TabsList>
@@ -74,7 +79,11 @@ export function DelegateDashboard() {
           <DraftList isLoading={isLoading} />
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
+        <TabsContent value="rejected" className="mt-4">
+          <RejectedList />
+        </TabsContent>
+
+        <TabsContent value="published" className="mt-4">
           <DelegateHistoryList />
         </TabsContent>
       </Tabs>

@@ -12,7 +12,7 @@ const GIFT_WRAP_KIND = 1059
 export function useDelegateReceipts() {
   const { ndk } = useNDKStore()
   const { user, isAuthenticated } = useAuthStore()
-  const { markAsPublished, saveDrafts, drafts } = useDraftStore()
+  const { markAsPublished, markAsRejected, saveDrafts, drafts } = useDraftStore()
   const subscriptionRef = useRef<NDKSubscription | null>(null)
 
   useEffect(() => {
@@ -72,11 +72,17 @@ export function useDelegateReceipts() {
               description: 'Your submission has been approved and published by the admin.',
             })
           } else if (receipt.action === 'rejected') {
-            // Update draft status back to draft so they can edit and resubmit
-            // For now, just show a notification
+            // Skip if already processed
+            if (draft.status === 'rejected') {
+              return
+            }
+
+            markAsRejected(receipt.submissionId, receipt.feedback)
+            await saveDrafts()
+
             toast({
               title: 'Submission Rejected',
-              description: receipt.feedback || 'The admin has rejected your submission.',
+              description: receipt.feedback || 'Your submission has been rejected by the publisher.',
               variant: 'destructive',
             })
           }
@@ -94,5 +100,5 @@ export function useDelegateReceipts() {
         subscriptionRef.current = null
       }
     }
-  }, [ndk, user, isAuthenticated, drafts, markAsPublished, saveDrafts])
+  }, [ndk, user, isAuthenticated, drafts, markAsPublished, markAsRejected, saveDrafts])
 }

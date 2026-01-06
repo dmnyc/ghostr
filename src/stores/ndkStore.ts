@@ -23,6 +23,7 @@ interface NDKStore {
   addRelay: (url: string) => void
   removeRelay: (url: string) => void
   fetchNIP65Relays: (pubkey: string) => Promise<RelayConfig[]>
+  connectToRelays: (relayUrls: string[]) => Promise<void>
 }
 
 export const useNDKStore = create<NDKStore>((set, get) => ({
@@ -170,10 +171,32 @@ export const useNDKStore = create<NDKStore>((set, get) => ({
       // Store in settings
       useSettingsStore.getState().setNIP65Relays(relayConfigs)
 
+      // Connect to NIP-65 relays if enabled
+      const { useNIP65 } = useSettingsStore.getState()
+      if (useNIP65 && relayConfigs.length > 0) {
+        for (const relay of relayConfigs) {
+          // Add relay if not already in pool
+          if (!ndk.pool.relays.has(relay.url)) {
+            ndk.addExplicitRelay(relay.url)
+          }
+        }
+      }
+
       return relayConfigs
     } catch (err) {
       console.error('Failed to fetch NIP-65 relays:', err)
       return []
+    }
+  },
+
+  connectToRelays: async (relayUrls: string[]) => {
+    const { ndk } = get()
+    if (!ndk) return
+
+    for (const url of relayUrls) {
+      if (!ndk.pool.relays.has(url)) {
+        ndk.addExplicitRelay(url)
+      }
     }
   },
 }))

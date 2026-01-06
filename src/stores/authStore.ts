@@ -61,8 +61,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Save session type
       localStorage.setItem('ghostr-auth-type', 'nip07')
 
-      // Fetch profile after login
+      // Fetch profile and NIP-65 relays after login
       await get().fetchProfile()
+
+      // Fetch and connect to user's NIP-65 relays
+      const { fetchNIP65Relays } = useNDKStore.getState()
+      await fetchNIP65Relays(user.pubkey)
     } catch (error) {
       set({
         isLoading: false,
@@ -91,8 +95,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
       })
 
-      // Fetch profile after login
+      // Fetch profile and NIP-65 relays after login
       await get().fetchProfile()
+
+      // Fetch and connect to user's NIP-65 relays
+      const { fetchNIP65Relays } = useNDKStore.getState()
+      await fetchNIP65Relays(user.pubkey)
     } catch (error) {
       set({
         isLoading: false,

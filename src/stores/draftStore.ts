@@ -20,6 +20,7 @@ interface DraftStore {
   getCurrentDraft: () => Draft | null
   markAsSubmitted: (id: string, adminNpub: string) => void
   markAsPublished: (id: string, eventId: string) => void
+  markAsRejected: (id: string, reason?: string) => void
 }
 
 export const useDraftStore = create<DraftStore>((set, get) => ({
@@ -129,6 +130,16 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
       drafts: state.drafts.map((draft) =>
         draft.id === id
           ? { ...draft, status: 'published' as const, publishedEventId: eventId, updatedAt: Date.now() }
+          : draft
+      ),
+    }))
+  },
+
+  markAsRejected: (id, reason) => {
+    set((state) => ({
+      drafts: state.drafts.map((draft) =>
+        draft.id === id
+          ? { ...draft, status: 'rejected' as const, rejectionReason: reason, updatedAt: Date.now() }
           : draft
       ),
     }))

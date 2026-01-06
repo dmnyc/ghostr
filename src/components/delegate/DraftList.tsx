@@ -11,8 +11,8 @@ interface DraftListProps {
 export function DraftList({ isLoading }: DraftListProps) {
   const { drafts, createDraft } = useDraftStore()
 
-  // Filter out published drafts - they appear in history
-  const activeDrafts = drafts.filter((d) => d.status !== 'published')
+  // Filter to only show drafts and submitted - published/rejected have their own tabs
+  const activeDrafts = drafts.filter((d) => d.status === 'draft' || d.status === 'submitted')
 
   if (isLoading) {
     return (

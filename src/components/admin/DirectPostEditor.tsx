@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { toast } from '@/hooks/useToast'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
 
@@ -19,6 +20,7 @@ interface DirectPostEditorProps {
 export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps) {
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
+  const { creditGhostr } = useSettingsStore()
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -51,6 +53,8 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       event.kind = isLongForm ? 30023 : 1
       event.content = content
 
+      const tags: string[][] = []
+
       if (isLongForm) {
         // Add NIP-23 tags for long-form content
         const slug = title
@@ -58,12 +62,19 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/(^-|-$)/g, '')
 
-        event.tags = [
+        tags.push(
           ['d', slug || `post-${Date.now()}`],
           ['title', title],
-          ['published_at', Math.floor(Date.now() / 1000).toString()],
-        ]
+          ['published_at', Math.floor(Date.now() / 1000).toString()]
+        )
       }
+
+      // Add client tag if enabled
+      if (creditGhostr) {
+        tags.push(['client', 'Ghostr'])
+      }
+
+      event.tags = tags
 
       await event.sign(signer)
       await event.publish()
