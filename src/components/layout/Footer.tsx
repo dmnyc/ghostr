@@ -5,7 +5,7 @@ import packageJson from '../../../package.json'
 export function Footer() {
   const [zapModal, setZapModal] = useState({
     show: false,
-    lightningAddress: 'daniel@breez.tips',
+    lightningAddress: 'ghostr@breez.tips',
     qrCode: '',
   })
 

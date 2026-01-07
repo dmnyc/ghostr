@@ -265,7 +265,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             <h3 className="font-medium">Post Type</h3>
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="kind-toggle">Long-form Article</Label>
+                <Label htmlFor="kind-toggle">
+                  {isLongForm ? 'Long-form Article' : 'Short Note'}
+                </Label>
                 <p className="text-xs text-muted-foreground">
                   Kind {isLongForm ? '30023' : '1'}
                 </p>
