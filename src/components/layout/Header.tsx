@@ -2,8 +2,6 @@ import { useEffect } from 'react'
 import { User, LogOut, Moon, Sun, Monitor, Settings } from 'lucide-react'
 import { GhostrLogo } from '@/components/common/GhostrLogo'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,10 +17,11 @@ import { useUIStore } from '@/stores/uiStore'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useSettingsStore, applyTheme } from '@/stores/settingsStore'
 import { RelayStatus } from '@/components/common/RelayStatus'
+import { cn } from '@/lib/utils/cn'
 
 export function Header() {
   const { isAuthenticated, user, profile, logout } = useAuthStore()
-  const { activeRole, toggleRole, setLoginModalOpen, setCurrentView } = useUIStore()
+  const { activeRole, setActiveRole, setLoginModalOpen, setCurrentView } = useUIStore()
   const { connectionStatus } = useNDKStore()
   const { theme, setTheme } = useSettingsStore()
 
@@ -39,27 +38,45 @@ export function Header() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <button
           onClick={() => setCurrentView('main')}
-          className="ghost-trigger flex items-center gap-3 hover:opacity-80 transition-opacity"
+          className="ghost-trigger flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
         >
-          <GhostrLogo className="h-12 w-12 ghost-float" />
-          <span style={{ fontFamily: '"Press Start 2P", cursive', fontSize: '1.2rem' }}>
+          <GhostrLogo className="h-8 w-8 sm:h-12 sm:w-12 ghost-float" />
+          <span
+            className="text-sm sm:text-lg"
+            style={{ fontFamily: '"Press Start 2P", cursive' }}
+          >
             GHOS<span style={{ marginLeft: '-0.15em' }}>TR</span>
           </span>
         </button>
 
-        <div className="flex items-center gap-4">
-          <RelayStatus />
-
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Role switcher - tabbed interface */}
           {isAuthenticated && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="role-toggle" className="text-sm text-muted-foreground">
-                {activeRole === 'delegate' ? 'Delegate' : 'Publisher'}
-              </Label>
-              <Switch
-                id="role-toggle"
-                checked={activeRole === 'admin'}
-                onCheckedChange={() => toggleRole()}
-              />
+            <div className="flex items-center bg-muted rounded-full p-1">
+              <button
+                onClick={() => setActiveRole('delegate')}
+                className={cn(
+                  'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
+                  activeRole === 'delegate'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <span className="hidden sm:inline">Delegate</span>
+                <span className="sm:hidden">Write</span>
+              </button>
+              <button
+                onClick={() => setActiveRole('admin')}
+                className={cn(
+                  'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
+                  activeRole === 'admin'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <span className="hidden sm:inline">Publisher</span>
+                <span className="sm:hidden">Pub</span>
+              </button>
             </div>
           )}
 
@@ -88,6 +105,11 @@ export function Header() {
                     <p className="text-xs text-muted-foreground font-mono">{shortNpub}</p>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                <div className="px-2 py-1.5">
+                  <RelayStatus />
+                </div>
                 <DropdownMenuSeparator />
 
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">

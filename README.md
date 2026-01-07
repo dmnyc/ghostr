@@ -71,6 +71,8 @@ npm run build
 
 Ghostr supports NIP-07 browser extensions (Alby, nos2x, etc.) for signing. Your private keys never leave your extension.
 
+**Note:** This application uses **NIP-44** for encryption to ensure modern security standards. It may not work properly with older browser extensions that only support NIP-04 encryption.
+
 ## License
 
 MIT

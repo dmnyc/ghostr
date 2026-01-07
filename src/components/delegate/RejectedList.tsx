@@ -16,10 +16,10 @@ export function RejectedList() {
 
   const handleResubmit = async (draft: Draft) => {
     // Reset to draft status so user can edit and resubmit
+    // Keep rejectionReason so it displays in editor as context
     updateDraft(draft.id, {
       status: 'draft',
       submittedTo: undefined,
-      rejectionReason: undefined,
     })
     await saveDrafts()
     setCurrentDraft(draft.id)

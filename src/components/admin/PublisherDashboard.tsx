@@ -9,10 +9,11 @@ import { EditArticleEditor } from './EditArticleEditor'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSubmissionStore, initializeProcessedIds } from '@/stores/submissionStore'
 import { useAdminInbox } from '@/hooks/useAdminInbox'
-import type { PublishedItem } from '@/stores/publishHistoryStore'
+import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
 
 export function PublisherDashboard() {
   const { currentSubmissionId, setCurrentSubmission, isLoading, submissions } = useSubmissionStore()
+  const { getUnreadCount, markAsViewed } = usePublishHistoryStore()
   const [activeTab, setActiveTab] = useState('inbox')
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [editingArticle, setEditingArticle] = useState<PublishedItem | null>(null)
@@ -42,7 +43,14 @@ export function PublisherDashboard() {
   }
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length
-  const historyCount = submissions.filter((s) => s.status === 'approved' || s.status === 'rejected').length
+  const unreadHistoryCount = getUnreadCount()
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    if (value === 'history') {
+      markAsViewed()
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -59,13 +67,18 @@ export function PublisherDashboard() {
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="inbox">
             Inbox {pendingCount > 0 && `(${pendingCount})`}
           </TabsTrigger>
-          <TabsTrigger value="history">
-            History {historyCount > 0 && `(${historyCount})`}
+          <TabsTrigger value="history" className="relative">
+            History
+            {unreadHistoryCount > 0 && (
+              <span className="ml-1.5 bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
+                {unreadHistoryCount}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 

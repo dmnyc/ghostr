@@ -21,6 +21,7 @@ import type { SubmissionPayload } from '@/types/submission'
 import type { Draft } from '@/types/draft'
 import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
+import { v4 as uuid } from 'uuid'
 
 interface SubmitDialogProps {
   open: boolean
@@ -124,10 +125,14 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
         tags.push(['image', draft.coverImage])
       }
 
+      // Generate unique submission ID for each submission
+      // This allows resubmissions after rejection (publisher tracks by submission ID)
+      const submissionId = uuid()
+
       const payload: SubmissionPayload = {
         protocol: PROTOCOL_VERSION,
         type: 'submission',
-        id: draft.id,
+        id: submissionId,
         content: draft.content,
         kind: draft.targetKind,
         tags,

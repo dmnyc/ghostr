@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Save, Send, Loader2, ExternalLink, X, User, Check, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Save, Send, Loader2, ExternalLink, X, User, Check, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -183,6 +183,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     setSubmitDialogOpen(true)
   }
 
+  const handleDismissRejection = async () => {
+    if (!draft) return
+    updateDraft(draft.id, { rejectionReason: undefined })
+    await saveDrafts()
+  }
+
   if (!draft) {
     return (
       <div className="text-center py-12">
@@ -199,6 +205,32 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   return (
     <div className="space-y-6">
+      {/* Rejection reason banner */}
+      {draft.rejectionReason && (
+        <div className="rounded-lg border-l-4 border-destructive bg-destructive/10 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="font-medium text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Submission Rejected
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {draft.rejectionReason}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={handleDismissRejection}
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onBack}>

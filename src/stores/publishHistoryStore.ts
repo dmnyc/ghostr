@@ -19,6 +19,7 @@ interface PublishHistoryStore {
   items: PublishedItem[]
   isLoaded: boolean
   isSaving: boolean
+  lastViewedAt: number | null
 
   loadHistory: () => Promise<void>
   saveHistory: () => Promise<void>
@@ -27,9 +28,25 @@ interface PublishHistoryStore {
   removeItem: (id: string) => void
   clearHistory: () => void
   getItemByDTag: (dTag: string) => PublishedItem | undefined
+  markAsViewed: () => void
+  getUnreadCount: () => number
 }
 
 const STORAGE_KEY = 'ghostr-publish-history'
+const LAST_VIEWED_KEY = 'ghostr-history-last-viewed'
+
+// Helper to load last viewed timestamp
+function loadLastViewed(): number | null {
+  try {
+    const stored = localStorage.getItem(LAST_VIEWED_KEY)
+    if (stored) {
+      return parseInt(stored, 10)
+    }
+  } catch {
+    // Ignore errors
+  }
+  return null
+}
 
 // Helper to save to localStorage (cache)
 function saveToCache(items: PublishedItem[]) {
@@ -57,6 +74,7 @@ export const usePublishHistoryStore = create<PublishHistoryStore>((set, get) => 
   items: [],
   isLoaded: false,
   isSaving: false,
+  lastViewedAt: loadLastViewed(),
 
   loadHistory: async () => {
     // First load from cache for immediate display
@@ -157,5 +175,24 @@ export const usePublishHistoryStore = create<PublishHistoryStore>((set, get) => 
   getItemByDTag: (dTag) => {
     const { items } = get()
     return items.find((i) => i.dTag === dTag)
+  },
+
+  markAsViewed: () => {
+    const timestamp = Date.now()
+    set({ lastViewedAt: timestamp })
+    try {
+      localStorage.setItem(LAST_VIEWED_KEY, timestamp.toString())
+    } catch {
+      // Ignore storage errors
+    }
+  },
+
+  getUnreadCount: () => {
+    const { items, lastViewedAt } = get()
+    if (!lastViewedAt) {
+      // Never viewed - show count only if there are items
+      return items.length > 0 ? items.length : 0
+    }
+    return items.filter((i) => i.publishedAt > lastViewedAt).length
   },
 }))

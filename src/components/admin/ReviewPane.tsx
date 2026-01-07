@@ -28,10 +28,9 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
   const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(null)
   const [showPreview, setShowPreview] = useState(false)
 
-  // Image handling for kind 1 submissions
+  // Image handling for both kind 1 and long-form submissions
   const imageUrls = extractImageUrls(editedContent)
   const hasImages = imageUrls.length > 0
-  const isKind1 = submission?.kind === 1
 
   // Fetch delegate profile
   useEffect(() => {
@@ -111,7 +110,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Content {!isProcessed && '(Editable)'}</Label>
-              {isKind1 && hasImages && (
+              {hasImages && (
                 <Button
                   type="button"
                   variant="outline"
@@ -139,18 +138,18 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               disabled={isProcessed}
               className={submission.kind === 30023 ? 'min-h-[400px] font-mono' : 'min-h-[200px]'}
             />
-            {isKind1 && showPreview && hasImages && (
+            {showPreview && hasImages && (
               <NotePreview content={editedContent} className="mt-2" />
             )}
             <p className="text-xs text-muted-foreground">
               {editedContent.length} characters
               {editedContent !== submission.content && ' (modified)'}
-              {isKind1 && hasImages && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
+              {hasImages && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
             </p>
           </div>
 
-          {/* Image Re-hosting Options for kind 1 submissions */}
-          {isKind1 && hasImages && !isProcessed && (
+          {/* Image Re-hosting Options for submissions with images */}
+          {hasImages && !isProcessed && (
             <ImageRehostingOptions
               content={editedContent}
               onContentChange={setEditedContent}

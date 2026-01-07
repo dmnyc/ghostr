@@ -1,7 +1,8 @@
-import { User, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { ProfileDisplay } from '@/components/common/ProfileDisplay'
 import { useSubmissionStore } from '@/stores/submissionStore'
 import type { Submission } from '@/types/submission'
 
@@ -40,8 +41,11 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
           <StatusBadge status={submission.status} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-          <User className="h-3 w-3" />
-          <span className="truncate">{submission.delegateNpub.slice(0, 16)}...</span>
+          <ProfileDisplay
+            pubkey={submission.delegatePubkey}
+            npub={submission.delegateNpub}
+            size="sm"
+          />
           <span>•</span>
           <span>{formattedDate}</span>
         </div>
