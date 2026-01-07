@@ -180,3 +180,50 @@ export function isValidImageUrl(url: string): boolean {
     return false
   }
 }
+
+/**
+ * Pattern to detect common image URLs in content
+ */
+const IMAGE_URL_REGEX = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)(\?[^\s]*)?/gi
+
+/**
+ * Extract all image URLs from content
+ */
+export function extractImageUrls(content: string): string[] {
+  return content.match(IMAGE_URL_REGEX) || []
+}
+
+/**
+ * Replace an image URL in content with a new URL
+ */
+export function replaceImageUrl(content: string, oldUrl: string, newUrl: string): string {
+  return content.replace(oldUrl, newUrl)
+}
+
+/**
+ * Re-upload an image from URL to Blossom server
+ */
+export async function reuploadImageToBlossom(
+  imageUrl: string,
+  signer: import('@nostr-dev-kit/ndk').NDKSigner,
+  server: string = 'https://blossom.nostr.build',
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadResult> {
+  // Fetch the image
+  const response = await fetch(imageUrl)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.statusText}`)
+  }
+
+  const blob = await response.blob()
+
+  // Determine filename from URL or use default
+  const urlPath = new URL(imageUrl).pathname
+  const filename = urlPath.split('/').pop() || 'image.jpg'
+
+  // Create File object from blob
+  const file = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+
+  // Upload to Blossom
+  return uploadToBlossom(file, signer, server, onProgress)
+}

@@ -1,4 +1,4 @@
-import { FileText, Trash2 } from 'lucide-react'
+import { FileText, Trash2, Archive } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
@@ -10,9 +10,9 @@ interface DraftCardProps {
 }
 
 export function DraftCard({ draft }: DraftCardProps) {
-  const { setCurrentDraft, deleteDraft, saveDrafts } = useDraftStore()
+  const { setCurrentDraft, deleteDraft, archiveDraft, saveDrafts } = useDraftStore()
 
-  const handleEdit = () => {
+  const handleView = () => {
     setCurrentDraft(draft.id)
   }
 
@@ -22,6 +22,15 @@ export function DraftCard({ draft }: DraftCardProps) {
       await saveDrafts()
     }
   }
+
+  const handleArchive = async () => {
+    if (window.confirm('Archive this submission? It will be hidden from your drafts list.')) {
+      archiveDraft(draft.id)
+      await saveDrafts()
+    }
+  }
+
+  const isSubmitted = draft.status === 'submitted'
 
   const excerpt = draft.content
     ? draft.content.slice(0, 100) + (draft.content.length > 100 ? '...' : '')
@@ -62,18 +71,30 @@ export function DraftCard({ draft }: DraftCardProps) {
           variant="default"
           size="sm"
           className="flex-1"
-          onClick={handleEdit}
+          onClick={handleView}
         >
-          Edit
+          {isSubmitted ? 'View' : 'Edit'}
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDelete}
-          disabled={draft.status === 'submitted'}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {draft.status === 'draft' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDelete}
+            title="Delete draft"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+        {isSubmitted && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleArchive}
+            title="Archive submission"
+          >
+            <Archive className="h-4 w-4" />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )

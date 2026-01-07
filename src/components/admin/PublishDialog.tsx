@@ -27,7 +27,6 @@ interface PublishDialogProps {
   submission: Submission
   editedContent: string
   onSuccess: () => void
-  initialCredit?: boolean
 }
 
 export function PublishDialog({
@@ -36,7 +35,6 @@ export function PublishDialog({
   submission,
   editedContent,
   onSuccess,
-  initialCredit,
 }: PublishDialogProps) {
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
@@ -46,7 +44,7 @@ export function PublishDialog({
 
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [includeCredit, setIncludeCredit] = useState(initialCredit ?? creditGhostr)
+  const [includeCredit, setIncludeCredit] = useState(creditGhostr)
 
   const handlePublish = async () => {
     if (!ndk || !signer) {

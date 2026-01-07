@@ -11,8 +11,10 @@ interface DraftListProps {
 export function DraftList({ isLoading }: DraftListProps) {
   const { drafts, createDraft } = useDraftStore()
 
-  // Filter to only show drafts and submitted - published/rejected have their own tabs
-  const activeDrafts = drafts.filter((d) => d.status === 'draft' || d.status === 'submitted')
+  // Filter to only show drafts and submitted (non-archived) - published/rejected have their own tabs
+  const activeDrafts = drafts.filter((d) =>
+    (d.status === 'draft' || d.status === 'submitted') && !d.archived
+  )
 
   if (isLoading) {
     return (

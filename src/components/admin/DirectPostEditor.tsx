@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -7,12 +7,15 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
+import { ImageUploadButton } from '@/components/common/ImageUploadButton'
+import { NotePreviewWithRemove } from '@/components/common/NotePreview'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { usePublishHistoryStore } from '@/stores/publishHistoryStore'
 import { toast } from '@/hooks/useToast'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
+import { extractImageUrls } from '@/lib/blossom'
 
 interface DirectPostEditorProps {
   onBack: () => void
@@ -31,6 +34,20 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
+  const [showPreview, setShowPreview] = useState(false)
+
+  const imageUrls = extractImageUrls(content)
+  const hasImages = imageUrls.length > 0
+
+  const handleImageUpload = (url: string) => {
+    // Append image URL to content with newline
+    setContent((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + url)
+  }
+
+  const handleRemoveImage = (url: string) => {
+    // Remove the image URL from content
+    setContent((prev) => prev.replace(url, '').replace(/\n\n+/g, '\n\n').trim())
+  }
 
   const handlePublish = async () => {
     if (!content.trim()) {
@@ -185,7 +202,35 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="content">Content</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content">Content</Label>
+              {!isLongForm && (
+                <div className="flex items-center gap-2">
+                  <ImageUploadButton onUpload={handleImageUpload} />
+                  {hasImages && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="gap-2"
+                    >
+                      {showPreview ? (
+                        <>
+                          <EyeOff className="h-4 w-4" />
+                          Hide Preview
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" />
+                          Preview
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
             {isLongForm ? (
               <MarkdownEditor
                 value={content}
@@ -201,8 +246,16 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 className="min-h-[200px]"
               />
             )}
+            {!isLongForm && showPreview && hasImages && (
+              <NotePreviewWithRemove
+                content={content}
+                onRemoveImage={handleRemoveImage}
+                className="mt-2"
+              />
+            )}
             <p className="text-xs text-muted-foreground">
               {content.length} characters
+              {hasImages && !isLongForm && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>

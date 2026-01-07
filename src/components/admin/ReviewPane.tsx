@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Check, X, User } from 'lucide-react'
+import { ArrowLeft, Check, X, User, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { NotePreview } from '@/components/common/NotePreview'
+import { ImageRehostingOptions } from './ImageRehostingOptions'
 import { PublishDialog } from './PublishDialog'
 import { FeedbackDialog } from './FeedbackDialog'
 import { useSubmissionStore } from '@/stores/submissionStore'
-import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { fetchProfile, getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
+import { extractImageUrls } from '@/lib/blossom'
 
 interface ReviewPaneProps {
   onBack: () => void
@@ -17,15 +19,19 @@ interface ReviewPaneProps {
 
 export function ReviewPane({ onBack }: ReviewPaneProps) {
   const { getCurrentSubmission } = useSubmissionStore()
-  const { creditGhostr } = useSettingsStore()
   const { isPublishDialogOpen, setPublishDialogOpen } = useUIStore()
 
   const submission = getCurrentSubmission()
 
   const [editedContent, setEditedContent] = useState(submission?.content ?? '')
   const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false)
-  const [includeCredit, setIncludeCredit] = useState(creditGhostr)
   const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+
+  // Image handling for kind 1 submissions
+  const imageUrls = extractImageUrls(editedContent)
+  const hasImages = imageUrls.length > 0
+  const isKind1 = submission?.kind === 1
 
   // Fetch delegate profile
   useEffect(() => {
@@ -70,29 +76,18 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
         </div>
 
         {!isProcessed && (
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeCredit}
-                onChange={(e) => setIncludeCredit(e.target.checked)}
-                className="rounded border-muted-foreground"
-              />
-              Credit Ghostr
-            </label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setFeedbackDialogOpen(true)}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Reject
-              </Button>
-              <Button onClick={() => setPublishDialogOpen(true)}>
-                <Check className="mr-2 h-4 w-4" />
-                Publish
-              </Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setFeedbackDialogOpen(true)}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Reject
+            </Button>
+            <Button onClick={() => setPublishDialogOpen(true)}>
+              <Check className="mr-2 h-4 w-4" />
+              Publish
+            </Button>
           </div>
         )}
       </div>
@@ -114,18 +109,54 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           )}
 
           <div className="space-y-2">
-            <Label>Content {!isProcessed && '(Editable)'}</Label>
+            <div className="flex items-center justify-between">
+              <Label>Content {!isProcessed && '(Editable)'}</Label>
+              {isKind1 && hasImages && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="gap-2"
+                >
+                  {showPreview ? (
+                    <>
+                      <EyeOff className="h-4 w-4" />
+                      Hide Preview
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             <Textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
               disabled={isProcessed}
               className={submission.kind === 30023 ? 'min-h-[400px] font-mono' : 'min-h-[200px]'}
             />
+            {isKind1 && showPreview && hasImages && (
+              <NotePreview content={editedContent} className="mt-2" />
+            )}
             <p className="text-xs text-muted-foreground">
               {editedContent.length} characters
               {editedContent !== submission.content && ' (modified)'}
+              {isKind1 && hasImages && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
             </p>
           </div>
+
+          {/* Image Re-hosting Options for kind 1 submissions */}
+          {isKind1 && hasImages && !isProcessed && (
+            <ImageRehostingOptions
+              content={editedContent}
+              onContentChange={setEditedContent}
+              disabled={isProcessed}
+            />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -196,7 +227,6 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
         submission={submission}
         editedContent={editedContent}
         onSuccess={onBack}
-        initialCredit={includeCredit}
       />
 
       <FeedbackDialog

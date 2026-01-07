@@ -20,6 +20,7 @@ export interface Draft {
   publishedEventId?: string
   rejectionReason?: string
   coverImage?: string
+  archived?: boolean
 }
 
 export interface DraftStore {

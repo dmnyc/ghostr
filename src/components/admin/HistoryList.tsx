@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, ExternalLink, Users, User, Pencil } from 'lucide-react'
+import { Trash2, ExternalLink, Users, User, Pencil, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -36,7 +36,8 @@ export function HistoryList({ onEditArticle }: HistoryListProps) {
 
   if (!isLoaded) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
         Loading history...
       </div>
     )

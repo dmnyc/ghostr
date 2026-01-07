@@ -14,6 +14,9 @@ export function useDelegateReceipts() {
   const { user, isAuthenticated } = useAuthStore()
   const { markAsPublished, markAsRejected, saveDrafts, drafts } = useDraftStore()
   const subscriptionRef = useRef<NDKSubscription | null>(null)
+  // Use ref to access current drafts in event handler without re-subscribing
+  const draftsRef = useRef(drafts)
+  draftsRef.current = drafts
 
   useEffect(() => {
     if (!ndk || !user || !isAuthenticated) {
@@ -51,8 +54,9 @@ export function useDelegateReceipts() {
 
           const receipt = unwrapped.payload as ReceiptPayload
 
-          // Find the corresponding draft
-          const draft = drafts.find((d) => d.id === receipt.submissionId)
+          // Use ref to get current drafts (avoids stale closure)
+          const currentDrafts = draftsRef.current
+          const draft = currentDrafts.find((d) => d.id === receipt.submissionId)
 
           if (!draft) {
             return
@@ -100,5 +104,6 @@ export function useDelegateReceipts() {
         subscriptionRef.current = null
       }
     }
-  }, [ndk, user, isAuthenticated, drafts, markAsPublished, markAsRejected, saveDrafts])
+  // Remove drafts from dependencies - we use ref to avoid re-subscribing
+  }, [ndk, user, isAuthenticated, markAsPublished, markAsRejected, saveDrafts])
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Save, Send, Loader2, ExternalLink, X, User } from 'lucide-react'
+import { ArrowLeft, Save, Send, Loader2, ExternalLink, X, User, Check, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,8 @@ import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { MentionTextarea } from '@/components/common/MentionTextarea'
 import { ProfileSearchInput } from '@/components/common/ProfileSearchInput'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
+import { ImageUploadButton } from '@/components/common/ImageUploadButton'
+import { NotePreviewWithRemove } from '@/components/common/NotePreview'
 import { SubmitDialog } from './SubmitDialog'
 import { useDraftStore } from '@/stores/draftStore'
 import { useFavoritesStore } from '@/stores/favoritesStore'
@@ -17,6 +19,7 @@ import { toast } from '@/hooks/useToast'
 import { useDebounce } from '@/hooks/useDebounce'
 import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
 import type { DraftPublisher } from '@/types/draft'
+import { extractImageUrls } from '@/lib/blossom'
 
 interface DraftEditorProps {
   onBack: () => void
@@ -39,9 +42,26 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [selectedPublisher, setSelectedPublisher] = useState<DraftPublisher | null>(
     draft?.targetPublisher ?? null
   )
+  const [showPreview, setShowPreview] = useState(false)
 
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true)
+
+  // Image handling for kind 1 notes
+  const imageUrls = extractImageUrls(content)
+  const hasImages = imageUrls.length > 0
+
+  const handleImageUpload = (url: string) => {
+    // Append image URL to content with newline
+    setContent((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + url)
+    setHasChanges(true)
+  }
+
+  const handleRemoveImage = (url: string) => {
+    // Remove the image URL from content
+    setContent((prev) => prev.replace(url, '').replace(/\n\n+/g, '\n\n').trim())
+    setHasChanges(true)
+  }
 
   // Load favorites on mount
   useEffect(() => {
@@ -257,7 +277,35 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="content">Content</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content">Content</Label>
+              {!isLongForm && !isSubmittedOrPublished && (
+                <div className="flex items-center gap-2">
+                  <ImageUploadButton onUpload={handleImageUpload} />
+                  {hasImages && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="gap-2"
+                    >
+                      {showPreview ? (
+                        <>
+                          <EyeOff className="h-4 w-4" />
+                          Hide Preview
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" />
+                          Preview
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
             {isLongForm ? (
               <MarkdownEditor
                 value={content}
@@ -277,8 +325,16 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 minHeight="200px"
               />
             )}
+            {!isLongForm && showPreview && hasImages && (
+              <NotePreviewWithRemove
+                content={content}
+                onRemoveImage={isSubmittedOrPublished ? () => {} : handleRemoveImage}
+                className="mt-2"
+              />
+            )}
             <p className="text-xs text-muted-foreground">
               {content.length} characters
+              {hasImages && !isLongForm && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
@@ -417,69 +473,30 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </p>
           </div>
 
-          {(draft.submittedTo || draft.targetPublisher) && isSubmittedOrPublished && (
-            <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="font-medium">Submitted To</h3>
-              {draft.targetPublisher ? (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
-                  {draft.targetPublisher.picture ? (
-                    <img
-                      src={draft.targetPublisher.picture}
-                      alt=""
-                      className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <User className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
-                      {draft.targetPublisher.displayName || draft.targetPublisher.name || formatNpub(draft.targetPublisher.pubkey)}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {draft.targetPublisher.nip05 || formatNpub(draft.targetPublisher.pubkey)}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs font-mono break-all">
-                  {draft.submittedTo}
-                </p>
-              )}
+          {draft.status === 'submitted' && !draft.publishedEventId && (
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-500">
+                <Check className="h-4 w-4" />
+                <span className="font-medium">Submitted</span>
+              </div>
             </div>
           )}
 
           {draft.publishedEventId && (
-            <div className="rounded-lg border p-4 space-y-3">
-              <h3 className="font-medium">Published</h3>
-              {draft.targetPublisher && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Published by:</p>
-                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
-                    {draft.targetPublisher.picture ? (
-                      <img
-                        src={draft.targetPublisher.picture}
-                        alt=""
-                        className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <User className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    )}
-                    <span className="text-sm truncate">
-                      {draft.targetPublisher.displayName || draft.targetPublisher.name || formatNpub(draft.targetPublisher.pubkey)}
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Event ID:</p>
-                <p className="text-xs font-mono break-all bg-muted/30 p-2 rounded">
-                  {draft.publishedEventId}
-                </p>
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-500">
+                <Check className="h-4 w-4" />
+                <span className="font-medium">Published</span>
               </div>
+              <a
+                href={`https://njump.me/${draft.publishedEventId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs font-mono break-all bg-muted/30 p-2 rounded hover:bg-muted transition-colors"
+              >
+                <span className="truncate">{draft.publishedEventId}</span>
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
             </div>
           )}
         </div>
