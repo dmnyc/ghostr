@@ -52,9 +52,9 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-3">{excerpt}</p>
+        <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
         {submission.note && (
-          <div className="mt-2 text-xs bg-muted p-2 rounded">
+          <div className="mt-2 text-xs bg-muted p-2 rounded break-words">
             <span className="font-medium">Note:</span> {submission.note}
           </div>
         )}

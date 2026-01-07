@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { User, LogOut, Moon, Sun, Monitor, Settings } from 'lucide-react'
 import { GhostrLogo } from '@/components/common/GhostrLogo'
 import { Button } from '@/components/ui/button'
@@ -24,11 +24,18 @@ export function Header() {
   const { activeRole, setActiveRole, setLoginModalOpen, setCurrentView } = useUIStore()
   const { connectionStatus } = useNDKStore()
   const { theme, setTheme } = useSettingsStore()
+  const [ghostAnimating, setGhostAnimating] = useState(false)
 
   // Apply theme on mount and when it changes
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  const handleLogoClick = () => {
+    // Toggle animation on touch devices
+    setGhostAnimating((prev) => !prev)
+    setCurrentView('main')
+  }
 
   const displayName = profile?.name || (user ? `${pubkeyToNpub(user.pubkey).slice(0, 12)}...` : 'Anonymous')
   const shortNpub = user ? `${pubkeyToNpub(user.pubkey).slice(0, 16)}...` : ''
@@ -37,10 +44,13 @@ export function Header() {
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <button
-          onClick={() => setCurrentView('main')}
+          onClick={handleLogoClick}
           className="ghost-trigger flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
         >
-          <GhostrLogo className="h-8 w-8 sm:h-12 sm:w-12 ghost-float" />
+          <GhostrLogo className={cn(
+            "h-8 w-8 sm:h-12 sm:w-12 ghost-float",
+            ghostAnimating && "ghost-float-active"
+          )} />
           <span
             className="text-sm sm:text-lg"
             style={{ fontFamily: '"Press Start 2P", cursive' }}

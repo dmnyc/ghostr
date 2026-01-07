@@ -186,7 +186,15 @@ body {
   }
 }
 
-.ghost-trigger:hover .ghost-float {
+/* Only apply hover animation on devices with real hover (not touch) */
+@media (hover: hover) {
+  .ghost-trigger:hover .ghost-float {
+    animation: ghost-float 1.5s ease-in-out infinite;
+  }
+}
+
+/* Class for toggled animation (used on mobile tap) */
+.ghost-float-active {
   animation: ghost-float 1.5s ease-in-out infinite;
 }
 

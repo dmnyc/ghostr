@@ -85,7 +85,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             </Button>
             <Button onClick={() => setPublishDialogOpen(true)}>
               <Check className="mr-2 h-4 w-4" />
-              Publish
+              Proceed to Publish
             </Button>
           </div>
         )}

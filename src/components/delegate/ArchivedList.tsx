@@ -56,7 +56,7 @@ export function ArchivedList() {
             </CardHeader>
 
             <CardContent className="flex-1">
-              <p className="text-sm text-muted-foreground line-clamp-3">{excerpt}</p>
+              <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
             </CardContent>
 
             <CardFooter>
