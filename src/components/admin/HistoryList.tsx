@@ -1,6 +1,13 @@
-import { useEffect, useState } from 'react'
-import { Trash2, ExternalLink, Users, User, Pencil, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useEffect, useState } from "react";
+import {
+  Trash2,
+  ExternalLink,
+  Users,
+  User,
+  Pencil,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,29 +17,32 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
+} from "@/components/ui/alert-dialog";
+import {
+  usePublishHistoryStore,
+  type PublishedItem,
+} from "@/stores/publishHistoryStore";
 
 interface HistoryListProps {
-  onEditArticle?: (item: PublishedItem) => void
+  onEditArticle?: (item: PublishedItem) => void;
 }
 
 export function HistoryList({ onEditArticle }: HistoryListProps) {
-  const { items, isLoaded, loadHistory, removeItem } = usePublishHistoryStore()
-  const [deletingItem, setDeletingItem] = useState<PublishedItem | null>(null)
+  const { items, isLoaded, loadHistory, removeItem } = usePublishHistoryStore();
+  const [deletingItem, setDeletingItem] = useState<PublishedItem | null>(null);
 
   useEffect(() => {
     if (!isLoaded) {
-      loadHistory()
+      loadHistory();
     }
-  }, [isLoaded, loadHistory])
+  }, [isLoaded, loadHistory]);
 
   const handleConfirmDelete = () => {
     if (deletingItem) {
-      removeItem(deletingItem.id)
-      setDeletingItem(null)
+      removeItem(deletingItem.id);
+      setDeletingItem(null);
     }
-  }
+  };
 
   if (!isLoaded) {
     return (
@@ -40,7 +50,7 @@ export function HistoryList({ onEditArticle }: HistoryListProps) {
         <Loader2 className="h-5 w-5 animate-spin mr-2" />
         Loading history...
       </div>
-    )
+    );
   }
 
   if (items.length === 0) {
@@ -48,7 +58,7 @@ export function HistoryList({ onEditArticle }: HistoryListProps) {
       <div className="text-center py-8 text-muted-foreground">
         No history yet. Published posts will appear here.
       </div>
-    )
+    );
   }
 
   return (
@@ -59,17 +69,26 @@ export function HistoryList({ onEditArticle }: HistoryListProps) {
             key={item.id}
             item={item}
             onDelete={() => setDeletingItem(item)}
-            onEdit={onEditArticle && item.kind === 30023 && item.dTag ? () => onEditArticle(item) : undefined}
+            onEdit={
+              onEditArticle && item.kind === 30023 && item.dTag
+                ? () => onEditArticle(item)
+                : undefined
+            }
           />
         ))}
       </div>
 
-      <AlertDialog open={!!deletingItem} onOpenChange={(open: boolean) => !open && setDeletingItem(null)}>
+      <AlertDialog
+        open={!!deletingItem}
+        onOpenChange={(open: boolean) => !open && setDeletingItem(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove from history?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the item from your local history only. The Nostr event will remain published on relays and cannot be deleted from here.
+              This will remove the item from your local history only. The Nostr
+              event will remain published on relays and cannot be deleted from
+              here.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -81,31 +100,36 @@ export function HistoryList({ onEditArticle }: HistoryListProps) {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }
 
 interface HistoryItemProps {
-  item: PublishedItem
-  onDelete: () => void
-  onEdit?: () => void
+  item: PublishedItem;
+  onDelete: () => void;
+  onEdit?: () => void;
 }
 
 function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
-  const excerpt = item.title || (item.content.slice(0, 60) + (item.content.length > 60 ? '...' : ''))
+  const excerpt =
+    item.title ||
+    item.content.slice(0, 60) + (item.content.length > 60 ? "..." : "");
   const delegateShort = item.delegateNpub
-    ? item.delegateNpub.slice(0, 12) + '...'
-    : null
+    ? item.delegateNpub.slice(0, 12) + "..."
+    : null;
 
-  const formattedDate = new Date(item.publishedAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
+  const formattedDate = new Date(item.publishedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-muted/50 group">
       {/* Source icon */}
-      <div className="shrink-0 text-muted-foreground" title={item.source === 'delegate' ? 'From delegate' : 'Direct post'}>
-        {item.source === 'delegate' ? (
+      <div
+        className="shrink-0 text-muted-foreground"
+        title={item.source === "delegate" ? "From delegate" : "Direct post"}
+      >
+        {item.source === "delegate" ? (
           <Users className="h-4 w-4" />
         ) : (
           <User className="h-4 w-4" />
@@ -121,7 +145,8 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
           </span>
         </div>
         <div className="text-xs text-muted-foreground">
-          {delegateShort ? `${delegateShort} • ` : ''}{formattedDate}
+          {delegateShort ? `${delegateShort} • ` : ""}
+          {formattedDate}
         </div>
       </div>
 
@@ -139,7 +164,7 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
           </Button>
         )}
         <a
-          href={`https://njump.me/${item.id}`}
+          href={`https://jumble.social/notes/${item.id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-accent"
@@ -158,5 +183,5 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
         </Button>
       </div>
     </div>
-  )
+  );
 }

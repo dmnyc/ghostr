@@ -1,86 +1,115 @@
-import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Save, Send, Loader2, ExternalLink, X, User, Check, Eye, EyeOff, AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { StatusBadge } from '@/components/common/StatusBadge'
-import { MarkdownEditor } from '@/components/common/MarkdownEditor'
-import { MentionTextarea } from '@/components/common/MentionTextarea'
-import { ProfileSearchInput } from '@/components/common/ProfileSearchInput'
-import { CoverImageInput } from '@/components/common/CoverImageInput'
-import { ImageUploadButton } from '@/components/common/ImageUploadButton'
-import { NotePreviewWithRemove } from '@/components/common/NotePreview'
-import { SubmitDialog } from './SubmitDialog'
-import { useDraftStore } from '@/stores/draftStore'
-import { useFavoritesStore } from '@/stores/favoritesStore'
-import { useUIStore } from '@/stores/uiStore'
-import { toast } from '@/hooks/useToast'
-import { useDebounce } from '@/hooks/useDebounce'
-import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
-import type { DraftPublisher } from '@/types/draft'
-import { extractImageUrls } from '@/lib/blossom'
+import { useState, useEffect, useRef } from "react";
+import {
+  ArrowLeft,
+  Save,
+  Send,
+  Loader2,
+  ExternalLink,
+  X,
+  User,
+  Check,
+  Eye,
+  EyeOff,
+  AlertCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { MarkdownEditor } from "@/components/common/MarkdownEditor";
+import { MentionTextarea } from "@/components/common/MentionTextarea";
+import { ProfileSearchInput } from "@/components/common/ProfileSearchInput";
+import { CoverImageInput } from "@/components/common/CoverImageInput";
+import { ImageUploadButton } from "@/components/common/ImageUploadButton";
+import { NotePreviewWithRemove } from "@/components/common/NotePreview";
+import { SubmitDialog } from "./SubmitDialog";
+import { useDraftStore } from "@/stores/draftStore";
+import { useFavoritesStore } from "@/stores/favoritesStore";
+import { useUIStore } from "@/stores/uiStore";
+import { toast } from "@/hooks/useToast";
+import { useDebounce } from "@/hooks/useDebounce";
+import {
+  getDisplayName,
+  formatNpub,
+  type SearchProfile,
+} from "@/services/profileSearchService";
+import type { DraftPublisher } from "@/types/draft";
+import { extractImageUrls } from "@/lib/blossom";
 
 interface DraftEditorProps {
-  onBack: () => void
+  onBack: () => void;
 }
 
 export function DraftEditor({ onBack }: DraftEditorProps) {
-  const { currentDraftId, drafts, updateDraft, saveDraft, isSaving } = useDraftStore()
-  const { favorites, loadFavorites, isLoaded: favoritesLoaded, addFavorite, removeFavorite, isFavorite } = useFavoritesStore()
-  const { isSubmitDialogOpen, setSubmitDialogOpen } = useUIStore()
+  const { currentDraftId, drafts, updateDraft, saveDraft, isSaving } =
+    useDraftStore();
+  const {
+    favorites,
+    loadFavorites,
+    isLoaded: favoritesLoaded,
+    addFavorite,
+    removeFavorite,
+    isFavorite,
+  } = useFavoritesStore();
+  const { isSubmitDialogOpen, setSubmitDialogOpen } = useUIStore();
 
   // Find draft by ID to avoid creating new object references
-  const draft = drafts.find((d) => d.id === currentDraftId)
+  const draft = drafts.find((d) => d.id === currentDraftId);
 
-  const [title, setTitle] = useState(draft?.title ?? '')
-  const [content, setContent] = useState(draft?.content ?? '')
-  const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023)
-  const [coverImage, setCoverImage] = useState<string | undefined>(draft?.coverImage)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [publisherSearch, setPublisherSearch] = useState('')
-  const [selectedPublisher, setSelectedPublisher] = useState<DraftPublisher | null>(
-    draft?.targetPublisher ?? null
-  )
-  const [showPreview, setShowPreview] = useState(false)
+  const [title, setTitle] = useState(draft?.title ?? "");
+  const [content, setContent] = useState(draft?.content ?? "");
+  const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
+  const [coverImage, setCoverImage] = useState<string | undefined>(
+    draft?.coverImage,
+  );
+  const [hasChanges, setHasChanges] = useState(false);
+  const [publisherSearch, setPublisherSearch] = useState("");
+  const [selectedPublisher, setSelectedPublisher] =
+    useState<DraftPublisher | null>(draft?.targetPublisher ?? null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Track if initial mount to avoid auto-save on first render
-  const isInitialMount = useRef(true)
+  const isInitialMount = useRef(true);
 
   // Image and mention handling for kind 1 notes
-  const imageUrls = extractImageUrls(content)
-  const hasImages = imageUrls.length > 0
-  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(content)
-  const hasPreviewContent = hasImages || hasMentions
+  const imageUrls = extractImageUrls(content);
+  const hasImages = imageUrls.length > 0;
+  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(content);
+  const hasPreviewContent = hasImages || hasMentions;
 
   const handleImageUpload = (url: string) => {
     // Append image URL to content with newline
-    setContent((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + url)
-    setHasChanges(true)
-  }
+    setContent(
+      (prev) => prev + (prev.endsWith("\n") || prev === "" ? "" : "\n") + url,
+    );
+    setHasChanges(true);
+  };
 
   const handleRemoveImage = (url: string) => {
     // Remove the image URL from content
-    setContent((prev) => prev.replace(url, '').replace(/\n\n+/g, '\n\n').trim())
-    setHasChanges(true)
-  }
+    setContent((prev) =>
+      prev.replace(url, "").replace(/\n\n+/g, "\n\n").trim(),
+    );
+    setHasChanges(true);
+  };
 
   // Load favorites on mount
   useEffect(() => {
     if (!favoritesLoaded) {
-      loadFavorites()
+      loadFavorites();
     }
-  }, [favoritesLoaded, loadFavorites])
+  }, [favoritesLoaded, loadFavorites]);
 
   // Auto-save with debounce (saves to both store and relay)
-  const debouncedContent = useDebounce(content, 1000)
-  const debouncedTitle = useDebounce(title, 1000)
+  const debouncedContent = useDebounce(content, 1000);
+  const debouncedTitle = useDebounce(title, 1000);
 
   useEffect(() => {
     // Skip the initial mount
     if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
+      isInitialMount.current = false;
+      return;
     }
 
     if (currentDraftId && hasChanges) {
@@ -90,33 +119,43 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
-      })
+      });
       // Also persist to relay (fire and forget)
       saveDraft(currentDraftId).catch(() => {
         // Silently fail - will retry on next change
-      })
+      });
     }
-  }, [debouncedContent, debouncedTitle, isLongForm, coverImage, selectedPublisher, currentDraftId, hasChanges, updateDraft, saveDraft])
+  }, [
+    debouncedContent,
+    debouncedTitle,
+    isLongForm,
+    coverImage,
+    selectedPublisher,
+    currentDraftId,
+    hasChanges,
+    updateDraft,
+    saveDraft,
+  ]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value)
-    setHasChanges(true)
-  }
+    setTitle(e.target.value);
+    setHasChanges(true);
+  };
 
   const handleContentChange = (value: string) => {
-    setContent(value)
-    setHasChanges(true)
-  }
+    setContent(value);
+    setHasChanges(true);
+  };
 
   const handleKindChange = (checked: boolean) => {
-    setIsLongForm(checked)
-    setHasChanges(true)
-  }
+    setIsLongForm(checked);
+    setHasChanges(true);
+  };
 
   const handleCoverImageChange = (url: string | undefined) => {
-    setCoverImage(url)
-    setHasChanges(true)
-  }
+    setCoverImage(url);
+    setHasChanges(true);
+  };
 
   const handlePublisherSelect = (profile: SearchProfile) => {
     const publisher: DraftPublisher = {
@@ -126,40 +165,40 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       displayName: profile.displayName,
       picture: profile.picture,
       nip05: profile.nip05,
-    }
-    setSelectedPublisher(publisher)
-    setPublisherSearch('')
-    setHasChanges(true)
-  }
+    };
+    setSelectedPublisher(publisher);
+    setPublisherSearch("");
+    setHasChanges(true);
+  };
 
   const handleClearPublisher = () => {
-    setSelectedPublisher(null)
-    setPublisherSearch('')
-    setHasChanges(true)
-  }
+    setSelectedPublisher(null);
+    setPublisherSearch("");
+    setHasChanges(true);
+  };
 
   const handleToggleFavorite = async (profile: SearchProfile) => {
     try {
       if (isFavorite(profile.pubkey)) {
-        await removeFavorite(profile.pubkey)
+        await removeFavorite(profile.pubkey);
         toast({
-          title: 'Removed from favorites',
+          title: "Removed from favorites",
           description: `${getDisplayName(profile)} removed from favorites`,
-        })
+        });
       } else {
-        await addFavorite(profile)
+        await addFavorite(profile);
         toast({
-          title: 'Added to favorites',
+          title: "Added to favorites",
           description: `${getDisplayName(profile)} added to favorites`,
-        })
+        });
       }
     } catch (err) {
-      console.error('Failed to update favorites:', err)
+      console.error("Failed to update favorites:", err);
     }
-  }
+  };
 
   const handleSave = async () => {
-    if (!draft) return
+    if (!draft) return;
 
     updateDraft(draft.id, {
       title,
@@ -167,33 +206,33 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       targetKind: isLongForm ? 30023 : 1,
       targetPublisher: selectedPublisher ?? undefined,
       coverImage: isLongForm ? coverImage : undefined,
-    })
+    });
 
-    await saveDraft(draft.id)
-    setHasChanges(false)
+    await saveDraft(draft.id);
+    setHasChanges(false);
     toast({
-      title: 'Draft saved',
-      description: 'Your draft has been saved to your Nostr relays.',
-    })
-  }
+      title: "Draft saved",
+      description: "Your draft has been saved to your Nostr relays.",
+    });
+  };
 
   const handleSubmitForReview = () => {
     if (!content.trim()) {
       toast({
-        title: 'Cannot submit',
-        description: 'Please add some content before submitting.',
-        variant: 'destructive',
-      })
-      return
+        title: "Cannot submit",
+        description: "Please add some content before submitting.",
+        variant: "destructive",
+      });
+      return;
     }
-    setSubmitDialogOpen(true)
-  }
+    setSubmitDialogOpen(true);
+  };
 
   const handleDismissRejection = async () => {
-    if (!draft) return
-    updateDraft(draft.id, { rejectionReason: undefined })
-    await saveDraft(draft.id)
-  }
+    if (!draft) return;
+    updateDraft(draft.id, { rejectionReason: undefined });
+    await saveDraft(draft.id);
+  };
 
   const handleBack = async () => {
     // Save before going back if there are changes
@@ -204,13 +243,13 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
-      })
+      });
       await saveDraft(draft.id).catch(() => {
         // Silently fail
-      })
+      });
     }
-    onBack()
-  }
+    onBack();
+  };
 
   if (!draft) {
     return (
@@ -220,11 +259,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           Go back
         </Button>
       </div>
-    )
+    );
   }
 
-  const isSubmittedOrPublished = draft.status === 'submitted' || draft.status === 'published'
-  const isPublished = draft.status === 'published'
+  const isSubmittedOrPublished =
+    draft.status === "submitted" || draft.status === "published";
+  const isPublished = draft.status === "published";
 
   return (
     <div className="space-y-6">
@@ -261,12 +301,14 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           </Button>
           <div>
             <h1 className="text-xl font-bold">
-              {isPublished ? 'View Published Post' : 'Edit Draft'}
+              {isPublished ? "View Published Post" : "Edit Draft"}
             </h1>
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge status={draft.status} />
               {hasChanges && !isPublished && (
-                <span className="text-xs text-muted-foreground">Unsaved changes</span>
+                <span className="text-xs text-muted-foreground">
+                  Unsaved changes
+                </span>
               )}
             </div>
           </div>
@@ -276,7 +318,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           {isPublished && draft.publishedEventId ? (
             <Button
               variant="outline"
-              onClick={() => window.open(`https://njump.me/${draft.publishedEventId}`, '_blank')}
+              onClick={() =>
+                window.open(
+                  `https://jumble.social/notes/${draft.publishedEventId}`,
+                  "_blank",
+                )
+              }
             >
               <ExternalLink className="mr-2 h-4 w-4" />
               View on Nostr
@@ -298,7 +345,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               <Button
                 onClick={handleSubmitForReview}
                 disabled={isSubmittedOrPublished || !selectedPublisher}
-                title={!selectedPublisher ? 'Select a publisher first' : undefined}
+                title={
+                  !selectedPublisher ? "Select a publisher first" : undefined
+                }
               >
                 <Send className="mr-2 h-4 w-4" />
                 Submit for Review
@@ -365,8 +414,8 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               <MarkdownEditor
                 value={content}
                 onChange={(val) => {
-                  setContent(val)
-                  setHasChanges(true)
+                  setContent(val);
+                  setHasChanges(true);
                 }}
                 placeholder="Write your article here..."
                 disabled={isSubmittedOrPublished}
@@ -383,13 +432,17 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             {!isLongForm && showPreview && hasPreviewContent && (
               <NotePreviewWithRemove
                 content={content}
-                onRemoveImage={isSubmittedOrPublished ? () => {} : handleRemoveImage}
+                onRemoveImage={
+                  isSubmittedOrPublished ? () => {} : handleRemoveImage
+                }
                 className="mt-2"
               />
             )}
             <p className="text-xs text-muted-foreground">
               {content.length} characters
-              {hasImages && !isLongForm && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
+              {hasImages &&
+                !isLongForm &&
+                ` | ${imageUrls.length} image${imageUrls.length !== 1 ? "s" : ""}`}
             </p>
           </div>
         </div>
@@ -413,10 +466,13 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">
-                    {selectedPublisher.displayName || selectedPublisher.name || formatNpub(selectedPublisher.pubkey)}
+                    {selectedPublisher.displayName ||
+                      selectedPublisher.name ||
+                      formatNpub(selectedPublisher.pubkey)}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {selectedPublisher.nip05 || formatNpub(selectedPublisher.pubkey)}
+                    {selectedPublisher.nip05 ||
+                      formatNpub(selectedPublisher.pubkey)}
                   </div>
                 </div>
                 {!isSubmittedOrPublished && (
@@ -436,22 +492,23 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 {/* Quick select favorites */}
                 {favorites.length > 0 && !isSubmittedOrPublished && (
                   <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground font-medium">Favorites</div>
+                    <div className="text-xs text-muted-foreground font-medium">
+                      Favorites
+                    </div>
                     {favorites.map((fav) => (
-                      <div
-                        key={fav.pubkey}
-                        className="flex items-center gap-1"
-                      >
+                      <div key={fav.pubkey} className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => handlePublisherSelect({
-                            pubkey: fav.pubkey,
-                            npub: fav.npub,
-                            name: fav.name,
-                            displayName: fav.displayName,
-                            picture: fav.picture,
-                            nip05: fav.nip05,
-                          })}
+                          onClick={() =>
+                            handlePublisherSelect({
+                              pubkey: fav.pubkey,
+                              npub: fav.npub,
+                              name: fav.name,
+                              displayName: fav.displayName,
+                              picture: fav.picture,
+                              nip05: fav.nip05,
+                            })
+                          }
                           className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm text-left min-w-0"
                         >
                           {fav.picture ? (
@@ -466,7 +523,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                             </div>
                           )}
                           <span className="truncate">
-                            {fav.displayName || fav.name || formatNpub(fav.pubkey)}
+                            {fav.displayName ||
+                              fav.name ||
+                              formatNpub(fav.pubkey)}
                           </span>
                         </button>
                         <button
@@ -511,10 +570,10 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="kind-toggle">
-                  {isLongForm ? 'Long-form Article' : 'Short Note'}
+                  {isLongForm ? "Long-form Article" : "Short Note"}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Kind {isLongForm ? '30023' : '1'}
+                  Kind {isLongForm ? "30023" : "1"}
                 </p>
               </div>
               <Switch
@@ -526,12 +585,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </div>
             <p className="text-xs text-muted-foreground">
               {isLongForm
-                ? 'Long-form articles (NIP-23) support markdown and are best for blog posts and articles.'
-                : 'Short notes (Kind 1) are like tweets - brief updates and thoughts.'}
+                ? "Long-form articles (NIP-23) support markdown and are best for blog posts and articles."
+                : "Short notes (Kind 1) are like tweets - brief updates and thoughts."}
             </p>
           </div>
 
-          {draft.status === 'submitted' && !draft.publishedEventId && (
+          {draft.status === "submitted" && !draft.publishedEventId && (
             <div className="rounded-lg border p-4">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500">
                 <Check className="h-4 w-4" />
@@ -547,7 +606,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 <span className="font-medium">Published</span>
               </div>
               <a
-                href={`https://njump.me/${draft.publishedEventId}`}
+                href={`https://jumble.social/notes/${draft.publishedEventId}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-xs font-mono break-all bg-muted/30 p-2 rounded hover:bg-muted transition-colors"
@@ -566,5 +625,5 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         draft={draft}
       />
     </div>
-  )
+  );
 }
