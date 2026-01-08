@@ -128,6 +128,7 @@ export async function sendGiftWrappedReceipt(
 export interface UnwrappedMessage {
   senderPubkey: string
   payload: SubmissionPayload | ReceiptPayload
+  createdAt: number  // Unix timestamp from the rumor
 }
 
 export async function unwrapGiftWrappedMessage(
@@ -172,6 +173,7 @@ export async function unwrapGiftWrappedMessage(
     return {
       senderPubkey: rumor.pubkey,
       payload,
+      createdAt: rumor.created_at || Math.floor(Date.now() / 1000),
     }
   } catch {
     // Expected for gift wraps from other apps - silently return null
@@ -182,7 +184,8 @@ export async function unwrapGiftWrappedMessage(
 export function submissionFromPayload(
   payload: SubmissionPayload,
   senderPubkey: string,
-  wrapEventId: string
+  wrapEventId: string,
+  createdAt: number  // Unix timestamp in seconds
 ): Submission {
   return {
     id: payload.id,
@@ -192,7 +195,7 @@ export function submissionFromPayload(
     kind: payload.kind,
     tags: payload.tags,
     note: payload.note,
-    receivedAt: Date.now(),
+    receivedAt: createdAt * 1000,  // Convert to milliseconds for JS Date
     status: 'pending',
     giftWrapEventId: wrapEventId,
   }

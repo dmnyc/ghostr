@@ -60,7 +60,8 @@ export function useAdminInbox() {
           const submission = submissionFromPayload(
             payload,
             unwrapped.senderPubkey,
-            event.id
+            event.id,
+            unwrapped.createdAt
           )
 
           addSubmission(submission)
