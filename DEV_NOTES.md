@@ -34,7 +34,7 @@ src/
 |-------|---------|
 | `authStore` | Authentication state, NIP-07/NSEC login, profile fetching |
 | `ndkStore` | NDK instance, relay connections, NIP-65 relay list |
-| `draftStore` | Drafts CRUD, NIP-78 persistence (encrypted to self) |
+| `draftStore` | Drafts CRUD, NIP-37 persistence + local caching |
 | `submissionStore` | Incoming submissions from delegates (in-memory) |
 | `publishHistoryStore` | Published posts history (localStorage persisted) |
 | `favoritesStore` | Favorite publishers (NIP-78 encrypted) |
@@ -49,9 +49,16 @@ src/
 - Login via Alby, nos2x, etc.
 - Session restore on page reload
 
+### NIP-37 - Draft Storage
+- **Kind 31234** (parameterized replaceable)
+- One event per draft with d-tag = draft UUID
+- Content encrypted to self via NIP-44
+- Local caching in localStorage for instant load
+- Background sync with relays
+
 ### NIP-78 - Application-Specific Data
 - **Kind 30078** with d-tag for app data storage
-- Used for: drafts, favorites
+- Used for: publish history, favorites
 - Encrypted to self via NIP-44
 
 ### NIP-59 - Gift Wrap
@@ -74,9 +81,10 @@ src/
 ### Delegate Flow
 1. Create draft (Kind 1 note or Kind 30023 article)
 2. Select target publisher from favorites or search
-3. Save draft to NIP-78 (encrypted, synced across devices)
+3. Save draft to NIP-37 (encrypted, cached locally, synced to relays)
 4. Submit for review → sends NIP-59 gift-wrapped message
-5. Receive receipt when approved/rejected
+5. Receive receipt when approved/rejected (matched by lastSubmissionId)
+6. Dismissed rejection notifications, resubmit after edits
 
 ### Publisher Flow
 1. Inbox receives NIP-59 gift-wrapped submissions
@@ -127,8 +135,11 @@ interface Draft {
   updatedAt: number
   targetPublisher?: DraftPublisher
   submittedTo?: string
+  lastSubmissionId?: string  // UUID for matching receipts
   publishedEventId?: string
-  coverImage?: string  // Cover image URL for long-form
+  rejectionReason?: string
+  coverImage?: string
+  archived?: boolean
 }
 ```
 

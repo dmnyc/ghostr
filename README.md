@@ -32,7 +32,7 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **Kind 30023 Articles** - Long-form markdown content with cover images
 - **Image Upload** - Upload to Blossom servers with preview
 - **Image Re-hosting** - Publishers can re-upload delegate images
-- **Draft Management** - Local drafts synced to relays via NIP-78
+- **Draft Management** - Local caching + relay sync via NIP-37
 - **Publish History** - Track all published content
 - **Favorite Publishers** - Quick access to frequent collaborators
 
@@ -52,7 +52,8 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **NIP-44** - Encrypted payloads
 - **NIP-59** - Gift-wrapped messages for private submissions
 - **NIP-65** - Relay list metadata
-- **NIP-78** - Application-specific data (draft & history storage)
+- **NIP-37** - Draft storage (one event per draft, encrypted)
+- **NIP-78** - Application-specific data (publish history, favorites)
 
 ## Getting Started
 
