@@ -49,10 +49,10 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **NIP-01** - Basic protocol (kind 1 notes)
 - **NIP-07** - Browser extension signing
 - **NIP-23** - Long-form content (kind 30023)
+- **NIP-37** - Draft storage (one event per draft, encrypted)
 - **NIP-44** - Encrypted payloads
 - **NIP-59** - Gift-wrapped messages for private submissions
 - **NIP-65** - Relay list metadata
-- **NIP-37** - Draft storage (one event per draft, encrypted)
 - **NIP-78** - Application-specific data (publish history, favorites)
 
 ## Getting Started
