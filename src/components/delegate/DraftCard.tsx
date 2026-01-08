@@ -10,7 +10,7 @@ interface DraftCardProps {
 }
 
 export function DraftCard({ draft }: DraftCardProps) {
-  const { setCurrentDraft, deleteDraft, archiveDraft, saveDrafts } = useDraftStore()
+  const { setCurrentDraft, deleteDraft, archiveDraft, saveDraft } = useDraftStore()
 
   const handleView = () => {
     setCurrentDraft(draft.id)
@@ -18,15 +18,14 @@ export function DraftCard({ draft }: DraftCardProps) {
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this draft?')) {
-      deleteDraft(draft.id)
-      await saveDrafts()
+      await deleteDraft(draft.id)
     }
   }
 
   const handleArchive = async () => {
     if (window.confirm('Archive this submission? It will be hidden from your drafts list.')) {
       archiveDraft(draft.id)
-      await saveDrafts()
+      await saveDraft(draft.id)
     }
   }
 

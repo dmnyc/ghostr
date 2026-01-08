@@ -6,13 +6,13 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { useDraftStore } from '@/stores/draftStore'
 
 export function ArchivedList() {
-  const { drafts, updateDraft, saveDrafts } = useDraftStore()
+  const { drafts, updateDraft, saveDraft } = useDraftStore()
 
   const archivedDrafts = drafts.filter((d) => d.archived)
 
   const handleUnarchive = async (id: string) => {
     updateDraft(id, { archived: false })
-    await saveDrafts()
+    await saveDraft(id)
   }
 
   if (archivedDrafts.length === 0) {

@@ -30,7 +30,7 @@ interface SubmitDialogProps {
 }
 
 export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
-  const { markAsSubmitted, saveDrafts } = useDraftStore()
+  const { markAsSubmitted, saveDraft } = useDraftStore()
   const { favorites, isLoaded, loadFavorites, addFavorite, removeFavorite, isFavorite } =
     useFavoritesStore()
 
@@ -141,8 +141,9 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
 
       await sendGiftWrappedSubmission(publisherPubkey, payload)
 
-      markAsSubmitted(draft.id, publisherNpub.trim())
-      await saveDrafts()
+      markAsSubmitted(draft.id, publisherNpub.trim(), submissionId)
+      // Save draft in background - don't block the UI
+      saveDraft(draft.id).catch((err) => console.error('Failed to save draft status:', err))
 
       toast({
         title: 'Submission sent',

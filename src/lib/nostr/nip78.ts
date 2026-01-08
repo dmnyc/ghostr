@@ -1,6 +1,13 @@
 import { NDKEvent } from '@nostr-dev-kit/ndk'
 import type { Draft } from '@/types/draft'
-import { DRAFT_D_TAG, DRAFT_KIND, PUBLISH_HISTORY_D_TAG, MAX_PUBLISH_HISTORY_ITEMS } from '@/lib/constants'
+import {
+  DRAFT_D_TAG,
+  DRAFT_KIND,
+  PUBLISH_HISTORY_D_TAG,
+  PROCESSED_SUBMISSIONS_D_TAG,
+  ARCHIVED_SUBMISSIONS_D_TAG,
+  MAX_PUBLISH_HISTORY_ITEMS,
+} from '@/lib/constants'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import type { PublishedItem } from '@/stores/publishHistoryStore'
@@ -151,6 +158,102 @@ export async function savePublishHistoryToRelay(items: PublishedItem[]): Promise
   event.kind = DRAFT_KIND
   event.content = encrypted
   event.tags = [['d', PUBLISH_HISTORY_D_TAG]]
+
+  await event.publish()
+}
+
+// Processed submissions (approved/rejected)
+export async function loadProcessedSubmissionsFromRelay(): Promise<string[]> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  const filter = {
+    kinds: [DRAFT_KIND],
+    authors: [user.pubkey],
+    '#d': [PROCESSED_SUBMISSIONS_D_TAG],
+  }
+
+  const event = await ndk.fetchEvent(filter)
+
+  if (!event) {
+    return []
+  }
+
+  try {
+    const decrypted = await signer.decrypt(user, event.content)
+    return JSON.parse(decrypted) as string[]
+  } catch {
+    return []
+  }
+}
+
+export async function saveProcessedSubmissionsToRelay(ids: string[]): Promise<void> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  const content = JSON.stringify(ids)
+  const encrypted = await signer.encrypt(user, content)
+
+  const event = new NDKEvent(ndk)
+  event.kind = DRAFT_KIND
+  event.content = encrypted
+  event.tags = [['d', PROCESSED_SUBMISSIONS_D_TAG]]
+
+  await event.publish()
+}
+
+// Archived submissions (dismissed without action)
+export async function loadArchivedSubmissionsFromRelay(): Promise<string[]> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  const filter = {
+    kinds: [DRAFT_KIND],
+    authors: [user.pubkey],
+    '#d': [ARCHIVED_SUBMISSIONS_D_TAG],
+  }
+
+  const event = await ndk.fetchEvent(filter)
+
+  if (!event) {
+    return []
+  }
+
+  try {
+    const decrypted = await signer.decrypt(user, event.content)
+    return JSON.parse(decrypted) as string[]
+  } catch {
+    return []
+  }
+}
+
+export async function saveArchivedSubmissionsToRelay(ids: string[]): Promise<void> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  const content = JSON.stringify(ids)
+  const encrypted = await signer.encrypt(user, content)
+
+  const event = new NDKEvent(ndk)
+  event.kind = DRAFT_KIND
+  event.content = encrypted
+  event.tags = [['d', ARCHIVED_SUBMISSIONS_D_TAG]]
 
   await event.publish()
 }

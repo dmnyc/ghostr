@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react'
-import { AlertTriangle, Loader2, Check, ExternalLink, RefreshCw, Link } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { AlertTriangle, Loader2, Check, ExternalLink, RefreshCw, Link, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { extractImageUrls, replaceImageUrl, reuploadImageToBlossom, isValidImageUrl } from '@/lib/blossom'
+import { extractImageUrls, replaceImageUrl, reuploadImageToBlossom, uploadToBlossom, isValidImageUrl } from '@/lib/blossom'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from '@/hooks/useToast'
 
@@ -30,14 +30,25 @@ export function ImageRehostingOptions({
   disabled,
 }: ImageRehostingOptionsProps) {
   const { signer } = useAuthStore()
-  const imageUrls = useMemo(() => extractImageUrls(content), [content])
+  // Store original URLs once on mount - don't recalculate from content
+  const originalUrlsRef = useRef<string[] | null>(null)
+  if (originalUrlsRef.current === null) {
+    originalUrlsRef.current = extractImageUrls(content)
+  }
+  const originalUrls = originalUrlsRef.current
+
   const [selectedOption, setSelectedOption] = useState<RehostOption>('trust')
   const [imageStatuses, setImageStatuses] = useState<Record<string, ImageStatus>>(() =>
-    Object.fromEntries(imageUrls.map((url) => [url, { url, status: 'pending' as const }]))
+    Object.fromEntries(originalUrls.map((url) => [url, { url, status: 'pending' as const }]))
   )
+  // Track current content for URL replacement
+  const contentRef = useRef(content)
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
 
   // Don't render if no images
-  if (imageUrls.length === 0) {
+  if (originalUrls.length === 0) {
     return null
   }
 
@@ -64,8 +75,8 @@ export function ImageRehostingOptions({
         [originalUrl]: { ...prev[originalUrl]!, status: 'done', newUrl: result.url },
       }))
 
-      // Update content with new URL
-      onContentChange(replaceImageUrl(content, originalUrl, result.url))
+      // Update content with new URL (use ref for latest content)
+      onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
 
       toast({
         title: 'Image re-uploaded',
@@ -90,11 +101,59 @@ export function ImageRehostingOptions({
   }
 
   const handleReuploadAll = async () => {
-    for (const url of imageUrls) {
+    for (const url of originalUrls) {
       const status = imageStatuses[url]
       if (status?.status === 'pending') {
         await handleReuploadImage(url)
       }
+    }
+  }
+
+  const handleUploadFile = async (originalUrl: string, file: File) => {
+    if (!signer) {
+      toast({
+        title: 'Not authenticated',
+        description: 'Please log in to upload images.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setImageStatuses((prev) => ({
+      ...prev,
+      [originalUrl]: { ...prev[originalUrl]!, status: 'uploading' },
+    }))
+
+    try {
+      const result = await uploadToBlossom(file, signer)
+
+      setImageStatuses((prev) => ({
+        ...prev,
+        [originalUrl]: { ...prev[originalUrl]!, status: 'done', newUrl: result.url },
+      }))
+
+      // Update content with new URL (use ref for latest content)
+      onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
+
+      toast({
+        title: 'Image uploaded',
+        description: 'Image has been uploaded to your Blossom account.',
+      })
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setImageStatuses((prev) => ({
+        ...prev,
+        [originalUrl]: {
+          ...prev[originalUrl]!,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Failed to upload',
+        },
+      }))
+      toast({
+        title: 'Upload failed',
+        description: err instanceof Error ? err.message : 'Failed to upload image.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -118,7 +177,7 @@ export function ImageRehostingOptions({
       return
     }
 
-    onContentChange(replaceImageUrl(content, originalUrl, status.customUrl))
+    onContentChange(replaceImageUrl(contentRef.current, originalUrl, status.customUrl))
     setImageStatuses((prev) => ({
       ...prev,
       [originalUrl]: { ...prev[originalUrl]!, status: 'done', newUrl: status.customUrl },
@@ -129,8 +188,31 @@ export function ImageRehostingOptions({
     })
   }
 
-  const pendingCount = imageUrls.filter((url) => imageStatuses[url]?.status === 'pending').length
-  const uploadingCount = imageUrls.filter((url) => imageStatuses[url]?.status === 'uploading').length
+  const pendingCount = originalUrls.filter((url) => imageStatuses[url]?.status === 'pending').length
+  const uploadingCount = originalUrls.filter((url) => imageStatuses[url]?.status === 'uploading').length
+  const doneCount = originalUrls.filter((url) => imageStatuses[url]?.status === 'done').length
+  const allDone = doneCount === originalUrls.length
+
+  // Hide the warning once all images have been re-uploaded
+  if (allDone) {
+    return (
+      <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-4">
+        <div className="flex items-center gap-3">
+          <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+          <div>
+            <h4 className="font-medium text-green-700 dark:text-green-400">
+              {originalUrls.length === 1 ? 'Image Re-uploaded' : 'Images Re-uploaded'}
+            </h4>
+            <p className="text-sm text-muted-foreground mt-1">
+              {originalUrls.length === 1
+                ? 'The image has been re-uploaded to your Blossom account.'
+                : `All ${originalUrls.length} images have been re-uploaded to your Blossom account.`}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/5 p-4 space-y-4">
@@ -142,7 +224,7 @@ export function ImageRehostingOptions({
             Delegate-Provided Images
           </h4>
           <p className="text-sm text-muted-foreground mt-1">
-            This submission contains {imageUrls.length} image URL{imageUrls.length !== 1 ? 's' : ''} provided by the delegate.
+            This submission contains {originalUrls.length} image URL{originalUrls.length !== 1 ? 's' : ''} provided by the delegate.
             The delegate can delete these images after publication.
           </p>
         </div>
@@ -180,11 +262,10 @@ export function ImageRehostingOptions({
           {pendingCount > 0 && (
             <Button
               type="button"
-              variant="outline"
               size="sm"
               onClick={handleReuploadAll}
               disabled={disabled || uploadingCount > 0}
-              className="gap-2"
+              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white"
             >
               {uploadingCount > 0 ? (
                 <>
@@ -201,7 +282,7 @@ export function ImageRehostingOptions({
           )}
 
           <div className="space-y-2">
-            {imageUrls.map((url) => {
+            {originalUrls.map((url) => {
               const status = imageStatuses[url]
               return (
                 <ImageItem
@@ -210,6 +291,7 @@ export function ImageRehostingOptions({
                   status={status}
                   mode="reupload"
                   onReupload={() => handleReuploadImage(url)}
+                  onUploadFile={(file) => handleUploadFile(url, file)}
                   disabled={disabled}
                 />
               )
@@ -221,7 +303,7 @@ export function ImageRehostingOptions({
       {/* Custom URL Section */}
       {selectedOption === 'custom' && (
         <div className="space-y-3 pl-6">
-          {imageUrls.map((url) => {
+          {originalUrls.map((url) => {
             const status = imageStatuses[url]
             return (
               <ImageItemWithCustomUrl
@@ -245,13 +327,26 @@ interface ImageItemProps {
   status?: ImageStatus
   mode: 'reupload' | 'custom'
   onReupload?: () => void
+  onUploadFile?: (file: File) => void
   disabled?: boolean
 }
 
-function ImageItem({ url, status, mode, onReupload, disabled }: ImageItemProps) {
+function ImageItem({ url, status, mode, onReupload, onUploadFile, disabled }: ImageItemProps) {
   const [showPreview, setShowPreview] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const displayUrl = status?.newUrl || url
   const shortUrl = displayUrl.length > 50 ? displayUrl.slice(0, 50) + '...' : displayUrl
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && onUploadFile) {
+      onUploadFile(file)
+    }
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <div className="text-sm border rounded p-2 space-y-2">
@@ -279,16 +374,35 @@ function ImageItem({ url, status, mode, onReupload, disabled }: ImageItemProps) 
             {showPreview ? 'Hide' : 'Preview'}
           </Button>
           {mode === 'reupload' && status?.status !== 'done' && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2"
-              onClick={onReupload}
-              disabled={disabled || status?.status === 'uploading'}
-            >
-              Re-upload
-            </Button>
+            <>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 px-2 bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={onReupload}
+                disabled={disabled || status?.status === 'uploading'}
+              >
+                Re-upload
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || status?.status === 'uploading'}
+                title="Upload a different image"
+              >
+                <Upload className="h-3.5 w-3.5" />
+              </Button>
+            </>
           )}
           <a
             href={displayUrl}

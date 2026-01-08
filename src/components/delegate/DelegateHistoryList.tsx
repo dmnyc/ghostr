@@ -6,7 +6,7 @@ import { useDraftStore } from '@/stores/draftStore'
 import type { Draft } from '@/types/draft'
 
 export function DelegateHistoryList() {
-  const { drafts, setCurrentDraft, deleteDraft, saveDrafts } = useDraftStore()
+  const { drafts, setCurrentDraft, deleteDraft } = useDraftStore()
 
   const publishedDrafts = drafts.filter((d) => d.status === 'published')
 
@@ -16,8 +16,7 @@ export function DelegateHistoryList() {
 
   const handleDelete = async (draft: Draft) => {
     if (window.confirm('Are you sure you want to delete this from history?')) {
-      deleteDraft(draft.id)
-      await saveDrafts()
+      await deleteDraft(draft.id)
     }
   }
 

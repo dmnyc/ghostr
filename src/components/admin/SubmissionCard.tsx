@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { FileText, Archive } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
@@ -11,10 +11,14 @@ interface SubmissionCardProps {
 }
 
 export function SubmissionCard({ submission }: SubmissionCardProps) {
-  const { setCurrentSubmission } = useSubmissionStore()
+  const { setCurrentSubmission, archiveSubmission } = useSubmissionStore()
 
   const handleReview = () => {
     setCurrentSubmission(submission.id)
+  }
+
+  const handleArchive = () => {
+    archiveSubmission(submission.id)
   }
 
   const excerpt = submission.content
@@ -60,14 +64,22 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
         )}
       </CardContent>
 
-      <CardFooter>
+      <CardFooter className="gap-2">
         <Button
           variant="default"
           size="sm"
-          className="w-full"
+          className="flex-1"
           onClick={handleReview}
         >
           Review
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleArchive}
+          title="Archive without reviewing"
+        >
+          <Archive className="h-4 w-4" />
         </Button>
       </CardFooter>
     </Card>

@@ -11,7 +11,7 @@ export function Footer() {
 
   const version = packageJson.version
   const creatorNpub =
-    'npub1aeh2zw4elewy5682lxc6xnlqzjnxksq303gwu2npfaxd49vmde6qcq4nwx'
+    'npub1gh0strl6djhzj2h7rcvzx7x902uc5esdd7gwhkv4599aqz8m4pys8ryan3'
 
   const showZapModal = () => {
     const lightningAddress = zapModal.lightningAddress
@@ -61,7 +61,7 @@ export function Footer() {
                 className="text-xs px-3 py-1.5 rounded-full transition-colors inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 <User size={14} />
-                Follow Creator
+                Follow on Nostr
               </a>
               <button
                 onClick={showZapModal}

@@ -72,8 +72,7 @@ export function Header() {
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <span className="hidden sm:inline">Delegate</span>
-                <span className="sm:hidden">Write</span>
+                Delegate
               </button>
               <button
                 onClick={() => setActiveRole('admin')}
@@ -84,8 +83,7 @@ export function Header() {
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <span className="hidden sm:inline">Publisher</span>
-                <span className="sm:hidden">Pub</span>
+                Publisher
               </button>
             </div>
           )}

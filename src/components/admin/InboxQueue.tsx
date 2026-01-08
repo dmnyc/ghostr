@@ -1,6 +1,7 @@
-import { Inbox, Loader2 } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import { SubmissionCard } from './SubmissionCard'
 import { EmptyState } from '@/components/common/EmptyState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { useSubmissionStore } from '@/stores/submissionStore'
 
 interface InboxQueueProps {
@@ -13,11 +14,7 @@ export function InboxQueue({ isLoading }: InboxQueueProps) {
   const pendingSubmissions = submissions.filter((s) => s.status === 'pending')
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (pendingSubmissions.length === 0) {

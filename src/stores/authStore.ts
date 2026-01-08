@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { NDKSigner, NDKUser } from '@nostr-dev-kit/ndk'
 import { nip19 } from 'nostr-tools'
 import { useNDKStore } from './ndkStore'
+import { useDraftStore } from './draftStore'
+import { useSubmissionStore } from './submissionStore'
 import { createNIP07Signer, createNSECSigner } from '@/lib/ndk/signers'
 
 type SignerType = 'nip07' | 'nsec' | null
@@ -61,12 +63,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Save session type
       localStorage.setItem('ghostr-auth-type', 'nip07')
 
-      // Fetch profile and NIP-65 relays after login
-      await get().fetchProfile()
-
-      // Fetch and connect to user's NIP-65 relays
-      const { fetchNIP65Relays } = useNDKStore.getState()
-      await fetchNIP65Relays(user.pubkey)
+      // Fetch profile and NIP-65 relays in background (don't block login)
+      get().fetchProfile().catch(() => {})
+      useNDKStore.getState().fetchNIP65Relays(user.pubkey).catch(() => {})
     } catch (error) {
       set({
         isLoading: false,
@@ -95,12 +94,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
       })
 
-      // Fetch profile and NIP-65 relays after login
-      await get().fetchProfile()
-
-      // Fetch and connect to user's NIP-65 relays
-      const { fetchNIP65Relays } = useNDKStore.getState()
-      await fetchNIP65Relays(user.pubkey)
+      // Fetch profile and NIP-65 relays in background (don't block login)
+      get().fetchProfile().catch(() => {})
+      useNDKStore.getState().fetchNIP65Relays(user.pubkey).catch(() => {})
     } catch (error) {
       set({
         isLoading: false,
@@ -118,6 +114,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Clear saved session and role
     localStorage.removeItem('ghostr-auth-type')
     sessionStorage.removeItem('ghostr-active-role')
+
+    // Clear user-specific stores
+    useDraftStore.getState().clearDrafts()
+    useSubmissionStore.getState().setSubmissions([])
 
     set({
       isAuthenticated: false,

@@ -64,7 +64,11 @@ export async function sendGiftWrappedSubmission(
   wrap.created_at = randomizeTimestamp()
 
   await wrap.sign(ephemeralSigner)
-  await wrap.publish()
+
+  // Race publish against a timeout - don't wait forever for slow relays
+  const publishPromise = wrap.publish()
+  const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3000))
+  await Promise.race([publishPromise, timeoutPromise])
 }
 
 export async function sendGiftWrappedReceipt(
@@ -114,7 +118,11 @@ export async function sendGiftWrappedReceipt(
   wrap.created_at = randomizeTimestamp()
 
   await wrap.sign(ephemeralSigner)
-  await wrap.publish()
+
+  // Race publish against a timeout - don't wait forever for slow relays
+  const publishPromise = wrap.publish()
+  const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3000))
+  await Promise.race([publishPromise, timeoutPromise])
 }
 
 export interface UnwrappedMessage {
@@ -165,8 +173,8 @@ export async function unwrapGiftWrappedMessage(
       senderPubkey: rumor.pubkey,
       payload,
     }
-  } catch (error) {
-    console.error('Failed to unwrap gift wrapped message:', error)
+  } catch {
+    // Expected for gift wraps from other apps - silently return null
     return null
   }
 }

@@ -1,6 +1,118 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { extractImageUrls } from '@/lib/blossom'
+import { fetchProfile, type SearchProfile } from '@/services/profileSearchService'
+import { nip19 } from 'nostr-tools'
+
+// Extract all nostr:npub mentions from content
+function extractNpubMentions(content: string): string[] {
+  const regex = /nostr:(npub1[a-zA-Z0-9]{58})/g
+  const matches: string[] = []
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    const npub = match[1]
+    if (npub && !matches.includes(npub)) {
+      matches.push(npub)
+    }
+  }
+  return matches
+}
+
+// Hook to fetch profiles for npub mentions
+function useMentionProfiles(content: string) {
+  const [profiles, setProfiles] = useState<Map<string, SearchProfile>>(new Map())
+  const [loading, setLoading] = useState(false)
+
+  const npubs = useMemo(() => extractNpubMentions(content), [content])
+
+  useEffect(() => {
+    if (npubs.length === 0) return
+
+    setLoading(true)
+    const fetchAll = async () => {
+      const newProfiles = new Map<string, SearchProfile>()
+
+      await Promise.all(
+        npubs.map(async (npub) => {
+          try {
+            const decoded = nip19.decode(npub)
+            if (decoded.type === 'npub') {
+              const profile = await fetchProfile(decoded.data)
+              if (profile) {
+                newProfiles.set(npub, profile)
+              }
+            }
+          } catch {
+            // Ignore invalid npubs
+          }
+        })
+      )
+
+      setProfiles(newProfiles)
+      setLoading(false)
+    }
+
+    fetchAll()
+  }, [npubs])
+
+  return { profiles, loading, hasMentions: npubs.length > 0 }
+}
+
+// Render content with mentions replaced by profile names
+function ContentWithMentions({ content, profiles }: { content: string; profiles: Map<string, SearchProfile> }) {
+  // Remove image URLs from the display text
+  const imageUrls = extractImageUrls(content)
+  let displayText = content
+  imageUrls.forEach((url) => {
+    displayText = displayText.replace(url, '').trim()
+  })
+
+  // Replace nostr:npub mentions with profile names
+  const parts: ReactNode[] = []
+  const regex = /nostr:(npub1[a-zA-Z0-9]{58})/g
+  let lastIndex = 0
+  let match
+
+  while ((match = regex.exec(displayText)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(displayText.slice(lastIndex, match.index))
+    }
+
+    // Add the mention
+    const npub = match[1]
+    if (npub) {
+      const profile = profiles.get(npub)
+      const displayName = profile?.displayName || profile?.name || `${npub.slice(0, 12)}...`
+
+      parts.push(
+        <span
+          key={match.index}
+          className="text-primary font-medium"
+        >
+          @{displayName}
+        </span>
+      )
+    }
+
+    lastIndex = match.index + match[0].length
+  }
+
+  // Add remaining text
+  if (lastIndex < displayText.length) {
+    parts.push(displayText.slice(lastIndex))
+  }
+
+  if (parts.length === 0 || displayText.trim() === '') {
+    return null
+  }
+
+  return (
+    <div className="text-sm whitespace-pre-wrap break-words">
+      {parts}
+    </div>
+  )
+}
 
 interface NotePreviewProps {
   content: string
@@ -9,19 +121,33 @@ interface NotePreviewProps {
 
 export function NotePreview({ content, className }: NotePreviewProps) {
   const imageUrls = useMemo(() => extractImageUrls(content), [content])
+  const { profiles, hasMentions } = useMentionProfiles(content)
 
-  if (imageUrls.length === 0) {
+  const hasContent = imageUrls.length > 0 || hasMentions
+
+  if (!hasContent) {
     return null
   }
 
   return (
     <div className={className}>
-      <div className="grid gap-2" style={{
-        gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))'
-      }}>
-        {imageUrls.map((url, index) => (
-          <ImagePreview key={`${url}-${index}`} url={url} />
-        ))}
+      <div className="text-xs text-muted-foreground font-medium mb-2">Preview</div>
+      <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+        {/* Text content with rendered mentions */}
+        {hasMentions && (
+          <ContentWithMentions content={content} profiles={profiles} />
+        )}
+
+        {/* Image grid */}
+        {imageUrls.length > 0 && (
+          <div className="grid gap-2" style={{
+            gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))'
+          }}>
+            {imageUrls.map((url, index) => (
+              <ImagePreview key={`${url}-${index}`} url={url} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -69,23 +195,37 @@ interface NotePreviewWithRemoveProps {
 
 export function NotePreviewWithRemove({ content, onRemoveImage, className }: NotePreviewWithRemoveProps) {
   const imageUrls = useMemo(() => extractImageUrls(content), [content])
+  const { profiles, hasMentions } = useMentionProfiles(content)
 
-  if (imageUrls.length === 0) {
+  const hasContent = imageUrls.length > 0 || hasMentions
+
+  if (!hasContent) {
     return null
   }
 
   return (
     <div className={className}>
-      <div className="grid gap-2" style={{
-        gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))'
-      }}>
-        {imageUrls.map((url, index) => (
-          <ImagePreviewWithRemove
-            key={`${url}-${index}`}
-            url={url}
-            onRemove={() => onRemoveImage(url)}
-          />
-        ))}
+      <div className="text-xs text-muted-foreground font-medium mb-2">Preview</div>
+      <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+        {/* Text content with rendered mentions */}
+        {hasMentions && (
+          <ContentWithMentions content={content} profiles={profiles} />
+        )}
+
+        {/* Image grid */}
+        {imageUrls.length > 0 && (
+          <div className="grid gap-2" style={{
+            gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))'
+          }}>
+            {imageUrls.map((url, index) => (
+              <ImagePreviewWithRemove
+                key={`${url}-${index}`}
+                url={url}
+                onRemove={() => onRemoveImage(url)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

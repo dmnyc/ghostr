@@ -17,6 +17,7 @@ export interface Draft {
   updatedAt: number
   targetPublisher?: DraftPublisher
   submittedTo?: string
+  lastSubmissionId?: string // ID sent to publisher, used to match receipts
   publishedEventId?: string
   rejectionReason?: string
   coverImage?: string

@@ -18,7 +18,7 @@ interface ReviewPaneProps {
 }
 
 export function ReviewPane({ onBack }: ReviewPaneProps) {
-  const { getCurrentSubmission } = useSubmissionStore()
+  const { getCurrentSubmission, updateSubmissionContent } = useSubmissionStore()
   const { isPublishDialogOpen, setPublishDialogOpen } = useUIStore()
 
   const submission = getCurrentSubmission()
@@ -28,9 +28,19 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
   const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(null)
   const [showPreview, setShowPreview] = useState(false)
 
-  // Image handling for both kind 1 and long-form submissions
+  // Image and mention handling for both kind 1 and long-form submissions
   const imageUrls = extractImageUrls(editedContent)
   const hasImages = imageUrls.length > 0
+  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(editedContent)
+  const hasPreviewContent = hasImages || hasMentions
+
+  // Update content and persist to store
+  const handleContentChange = (newContent: string) => {
+    setEditedContent(newContent)
+    if (submission) {
+      updateSubmissionContent(submission.id, newContent)
+    }
+  }
 
   // Fetch delegate profile
   useEffect(() => {
@@ -110,7 +120,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Content {!isProcessed && '(Editable)'}</Label>
-              {hasImages && (
+              {hasPreviewContent && (
                 <Button
                   type="button"
                   variant="outline"
@@ -134,11 +144,11 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             </div>
             <Textarea
               value={editedContent}
-              onChange={(e) => setEditedContent(e.target.value)}
+              onChange={(e) => handleContentChange(e.target.value)}
               disabled={isProcessed}
               className={submission.kind === 30023 ? 'min-h-[400px] font-mono' : 'min-h-[200px]'}
             />
-            {showPreview && hasImages && (
+            {showPreview && hasPreviewContent && (
               <NotePreview content={editedContent} className="mt-2" />
             )}
             <p className="text-xs text-muted-foreground">
@@ -152,7 +162,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           {hasImages && !isProcessed && (
             <ImageRehostingOptions
               content={editedContent}
-              onContentChange={setEditedContent}
+              onContentChange={handleContentChange}
               disabled={isProcessed}
             />
           )}

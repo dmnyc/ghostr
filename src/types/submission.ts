@@ -17,6 +17,6 @@ export interface Submission {
   tags: string[][]
   note: string
   receivedAt: number
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'archived'
   giftWrapEventId: string
 }

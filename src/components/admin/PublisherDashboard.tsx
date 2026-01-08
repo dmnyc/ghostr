@@ -4,23 +4,26 @@ import { Button } from '@/components/ui/button'
 import { InboxQueue } from './InboxQueue'
 import { ReviewPane } from './ReviewPane'
 import { HistoryList } from './HistoryList'
+import { ArchivedSubmissionsList } from './ArchivedSubmissionsList'
 import { DirectPostEditor } from './DirectPostEditor'
 import { EditArticleEditor } from './EditArticleEditor'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useSubmissionStore, initializeProcessedIds } from '@/stores/submissionStore'
+import { useSubmissionStore, initializeProcessedIds, syncProcessedIdsFromRelay } from '@/stores/submissionStore'
 import { useAdminInbox } from '@/hooks/useAdminInbox'
 import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
 
 export function PublisherDashboard() {
-  const { currentSubmissionId, setCurrentSubmission, isLoading, submissions } = useSubmissionStore()
+  const { currentSubmissionId, setCurrentSubmission, isLoading, submissions, archivedSubmissions } = useSubmissionStore()
   const { getUnreadCount, markAsViewed } = usePublishHistoryStore()
   const [activeTab, setActiveTab] = useState('inbox')
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [editingArticle, setEditingArticle] = useState<PublishedItem | null>(null)
 
-  // Initialize processed IDs from localStorage
+  // Initialize processed IDs from localStorage, then sync from relay
   useEffect(() => {
     initializeProcessedIds()
+    // Async load from relay and merge (runs in background)
+    syncProcessedIdsFromRelay()
   }, [])
 
   // Subscribe to inbox
@@ -43,6 +46,7 @@ export function PublisherDashboard() {
   }
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length
+  const archivedCount = archivedSubmissions.length
   const unreadHistoryCount = getUnreadCount()
 
   const handleTabChange = (value: string) => {
@@ -80,6 +84,9 @@ export function PublisherDashboard() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="archived">
+            Archived {archivedCount > 0 && `(${archivedCount})`}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="inbox" className="mt-4">
@@ -88,6 +95,10 @@ export function PublisherDashboard() {
 
         <TabsContent value="history" className="mt-4">
           <HistoryList onEditArticle={setEditingArticle} />
+        </TabsContent>
+
+        <TabsContent value="archived" className="mt-4">
+          <ArchivedSubmissionsList />
         </TabsContent>
       </Tabs>
     </div>

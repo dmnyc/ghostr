@@ -1,6 +1,7 @@
-import { FileText, Loader2 } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { DraftCard } from './DraftCard'
 import { EmptyState } from '@/components/common/EmptyState'
+import { LoadingState } from '@/components/common/LoadingState'
 import { Button } from '@/components/ui/button'
 import { useDraftStore } from '@/stores/draftStore'
 
@@ -17,11 +18,7 @@ export function DraftList({ isLoading }: DraftListProps) {
   )
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (activeDrafts.length === 0) {

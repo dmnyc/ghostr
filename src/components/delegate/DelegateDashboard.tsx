@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, X, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DraftList } from './DraftList'
@@ -20,6 +20,8 @@ export function DelegateDashboard() {
     createDraft,
     setCurrentDraft,
     isLoading,
+    unseenRejectionIds,
+    dismissAllRejections,
   } = useDraftStore()
   const [activeTab, setActiveTab] = useState('drafts')
 
@@ -30,7 +32,8 @@ export function DelegateDashboard() {
     if (isAuthenticated) {
       loadDrafts()
     }
-  }, [isAuthenticated, loadDrafts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   const handleNewDraft = () => {
     createDraft()
@@ -45,12 +48,64 @@ export function DelegateDashboard() {
   }
 
   const activeDrafts = drafts.filter((d) => (d.status === 'draft' || d.status === 'submitted') && !d.archived)
+  const rejectedDrafts = drafts.filter((d) => d.status === 'rejected' && !d.archived)
   const publishedCount = drafts.filter((d) => d.status === 'published').length
-  const rejectedCount = drafts.filter((d) => d.status === 'rejected').length
+  const rejectedCount = rejectedDrafts.length
   const archivedCount = drafts.filter((d) => d.archived).length
+
+  // Get unseen rejected drafts for the banner
+  const unseenRejectedDrafts = rejectedDrafts.filter((d) => unseenRejectionIds.has(d.id))
+  const hasUnseenRejections = unseenRejectedDrafts.length > 0
+
+  const handleViewRejected = () => {
+    setActiveTab('rejected')
+    dismissAllRejections()
+  }
 
   return (
     <div className="space-y-6">
+      {/* Rejection Banner */}
+      {hasUnseenRejections && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-destructive">
+                  {unseenRejectedDrafts.length === 1
+                    ? 'Your submission was rejected'
+                    : `${unseenRejectedDrafts.length} submissions were rejected`}
+                </h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {unseenRejectedDrafts.length === 1 && unseenRejectedDrafts[0]
+                    ? `"${unseenRejectedDrafts[0].title || 'Untitled'}" was rejected by the publisher.`
+                    : 'Check the Rejected tab to see feedback and edit your drafts.'}
+                  {unseenRejectedDrafts.length === 1 && unseenRejectedDrafts[0]?.rejectionReason && (
+                    <span className="block mt-1 italic">"{unseenRejectedDrafts[0].rejectionReason}"</span>
+                  )}
+                </p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="px-0 h-auto mt-2 text-destructive"
+                  onClick={handleViewRejected}
+                >
+                  View rejected {unseenRejectedDrafts.length === 1 ? 'draft' : 'drafts'} →
+                </Button>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={dismissAllRejections}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Your Drafts</h1>

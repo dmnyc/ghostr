@@ -26,7 +26,7 @@ interface DraftEditorProps {
 }
 
 export function DraftEditor({ onBack }: DraftEditorProps) {
-  const { currentDraftId, drafts, updateDraft, saveDrafts, isSaving } = useDraftStore()
+  const { currentDraftId, drafts, updateDraft, saveDraft, isSaving } = useDraftStore()
   const { favorites, loadFavorites, isLoaded: favoritesLoaded, addFavorite, removeFavorite, isFavorite } = useFavoritesStore()
   const { isSubmitDialogOpen, setSubmitDialogOpen } = useUIStore()
 
@@ -47,9 +47,11 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true)
 
-  // Image handling for kind 1 notes
+  // Image and mention handling for kind 1 notes
   const imageUrls = extractImageUrls(content)
   const hasImages = imageUrls.length > 0
+  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(content)
+  const hasPreviewContent = hasImages || hasMentions
 
   const handleImageUpload = (url: string) => {
     // Append image URL to content with newline
@@ -70,7 +72,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     }
   }, [favoritesLoaded, loadFavorites])
 
-  // Auto-save with debounce
+  // Auto-save with debounce (saves to both store and relay)
   const debouncedContent = useDebounce(content, 1000)
   const debouncedTitle = useDebounce(title, 1000)
 
@@ -89,8 +91,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
       })
+      // Also persist to relay (fire and forget)
+      saveDraft(currentDraftId).catch(() => {
+        // Silently fail - will retry on next change
+      })
     }
-  }, [debouncedContent, debouncedTitle, isLongForm, coverImage, selectedPublisher, currentDraftId, hasChanges, updateDraft])
+  }, [debouncedContent, debouncedTitle, isLongForm, coverImage, selectedPublisher, currentDraftId, hasChanges, updateDraft, saveDraft])
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value)
@@ -163,7 +169,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       coverImage: isLongForm ? coverImage : undefined,
     })
 
-    await saveDrafts()
+    await saveDraft(draft.id)
     setHasChanges(false)
     toast({
       title: 'Draft saved',
@@ -186,7 +192,24 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const handleDismissRejection = async () => {
     if (!draft) return
     updateDraft(draft.id, { rejectionReason: undefined })
-    await saveDrafts()
+    await saveDraft(draft.id)
+  }
+
+  const handleBack = async () => {
+    // Save before going back if there are changes
+    if (draft && hasChanges) {
+      updateDraft(draft.id, {
+        title,
+        content,
+        targetKind: isLongForm ? 30023 : 1,
+        targetPublisher: selectedPublisher ?? undefined,
+        coverImage: isLongForm ? coverImage : undefined,
+      })
+      await saveDraft(draft.id).catch(() => {
+        // Silently fail
+      })
+    }
+    onBack()
   }
 
   if (!draft) {
@@ -233,7 +256,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+          <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -314,7 +337,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               {!isLongForm && !isSubmittedOrPublished && (
                 <div className="flex items-center gap-2">
                   <ImageUploadButton onUpload={handleImageUpload} />
-                  {hasImages && (
+                  {hasPreviewContent && (
                     <Button
                       type="button"
                       variant="outline"
@@ -357,7 +380,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 minHeight="200px"
               />
             )}
-            {!isLongForm && showPreview && hasImages && (
+            {!isLongForm && showPreview && hasPreviewContent && (
               <NotePreviewWithRemove
                 content={content}
                 onRemoveImage={isSubmittedOrPublished ? () => {} : handleRemoveImage}
@@ -413,6 +436,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 {/* Quick select favorites */}
                 {favorites.length > 0 && !isSubmittedOrPublished && (
                   <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground font-medium">Favorites</div>
                     {favorites.map((fav) => (
                       <div
                         key={fav.pubkey}
