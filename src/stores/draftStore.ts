@@ -45,7 +45,8 @@ function clearDraftsCache(): void {
 
 // Merge relay drafts with cached/local drafts (prefer newer version by updatedAt)
 // Also protects status changes that happened locally (rejected, published) from being overwritten
-function mergeDrafts(local: Draft[], fromRelay: Draft[]): Draft[] {
+// deletedIds contains IDs of drafts that were explicitly deleted on the relay
+function mergeDrafts(local: Draft[], fromRelay: Draft[], deletedIds: Set<string> = new Set()): Draft[] {
   const relayMap = new Map(fromRelay.map((d) => [d.id, d]))
   const localMap = new Map(local.map((d) => [d.id, d]))
   const merged = new Map<string, Draft>()
@@ -54,6 +55,12 @@ function mergeDrafts(local: Draft[], fromRelay: Draft[]): Draft[] {
   const allIds = new Set([...relayMap.keys(), ...localMap.keys()])
 
   for (const id of allIds) {
+    // Skip drafts that have been explicitly deleted on the relay
+    if (deletedIds.has(id)) {
+      console.log('[mergeDrafts] Skipping deleted draft:', id)
+      continue
+    }
+
     const relayDraft = relayMap.get(id)
     const localDraft = localMap.get(id)
 
@@ -174,12 +181,13 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const relayDrafts = await loadDraftsWithMigration()
-        console.log('[DraftStore] Loaded', relayDrafts.length, 'drafts from relay on attempt', attempt)
+        const { drafts: relayDrafts, deletedIds } = await loadDraftsWithMigration()
+        console.log('[DraftStore] Loaded', relayDrafts.length, 'drafts from relay on attempt', attempt, 'with', deletedIds.size, 'deletions')
 
         // Merge with any locally-created drafts that haven't synced yet
+        // Pass deletedIds to ensure deleted drafts are removed from local cache
         const currentDrafts = get().drafts
-        const mergedDrafts = mergeDrafts(currentDrafts, relayDrafts)
+        const mergedDrafts = mergeDrafts(currentDrafts, relayDrafts, deletedIds)
 
         // Update store and cache
         set({

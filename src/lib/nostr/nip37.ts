@@ -108,9 +108,17 @@ async function waitForRelayConnection(ndk: NDK, timeoutMs: number = 2000): Promi
 }
 
 /**
+ * Result of loading drafts from relay
+ */
+export interface LoadDraftsResult {
+  drafts: Draft[]
+  deletedIds: Set<string>  // IDs of drafts that have been deleted (empty content events)
+}
+
+/**
  * Load all drafts from relay using NIP-37 format
  */
-export async function loadDraftsNIP37(): Promise<Draft[]> {
+export async function loadDraftsNIP37(): Promise<LoadDraftsResult> {
   const { ndk } = useNDKStore.getState()
   const { user, signer } = useAuthStore.getState()
 
@@ -148,11 +156,9 @@ export async function loadDraftsNIP37(): Promise<Draft[]> {
 
   console.log('[NIP-37] fetchEvents returned', events.size, 'events')
   const drafts: Draft[] = []
+  const deletedIds = new Set<string>()
 
   for (const event of events) {
-    // Skip events with empty content (deleted drafts)
-    if (!event.content) continue
-
     // Only process Ghostr drafts (check for client tag)
     const clientTag = event.tags.find((t) => t[0] === 'client')
     if (!clientTag || clientTag[1] !== 'ghostr') continue
@@ -162,6 +168,13 @@ export async function loadDraftsNIP37(): Promise<Draft[]> {
     if (!dTag || !dTag[1]) continue
 
     const draftId = dTag[1]
+
+    // Track deleted drafts (empty content = deletion marker)
+    if (!event.content) {
+      console.log('[NIP-37] Found deletion marker for draft:', draftId)
+      deletedIds.add(draftId)
+      continue
+    }
 
     try {
       // Decrypt content (NIP-44 encrypted to self)
@@ -176,7 +189,7 @@ export async function loadDraftsNIP37(): Promise<Draft[]> {
   // Sort by updatedAt descending (newest first)
   drafts.sort((a, b) => b.updatedAt - a.updatedAt)
 
-  return drafts
+  return { drafts, deletedIds }
 }
 
 /**
@@ -288,16 +301,16 @@ export async function deleteLegacyDraftsEvent(): Promise<void> {
 /**
  * Load drafts with automatic migration from legacy format
  */
-export async function loadDraftsWithMigration(): Promise<Draft[]> {
+export async function loadDraftsWithMigration(): Promise<LoadDraftsResult> {
   console.log('[NIP-37] Loading drafts...')
 
   // First, try to load NIP-37 drafts
-  const nip37Drafts = await loadDraftsNIP37()
-  console.log('[NIP-37] Found', nip37Drafts.length, 'NIP-37 drafts')
+  const result = await loadDraftsNIP37()
+  console.log('[NIP-37] Found', result.drafts.length, 'NIP-37 drafts,', result.deletedIds.size, 'deleted')
 
-  // If we found NIP-37 drafts, we're already migrated
-  if (nip37Drafts.length > 0) {
-    return nip37Drafts
+  // If we found NIP-37 drafts or deletion markers, we're already migrated
+  if (result.drafts.length > 0 || result.deletedIds.size > 0) {
+    return result
   }
 
   // No NIP-37 drafts found, check for legacy NIP-78 drafts
@@ -323,9 +336,9 @@ export async function loadDraftsWithMigration(): Promise<Draft[]> {
       console.error('Failed to delete legacy drafts event:', error)
     }
 
-    return legacyDrafts
+    return { drafts: legacyDrafts, deletedIds: new Set() }
   }
 
   // No drafts found anywhere
-  return []
+  return { drafts: [], deletedIds: new Set() }
 }
