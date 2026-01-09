@@ -106,14 +106,14 @@ export function DelegateDashboard() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Your Drafts</h1>
           <p className="text-muted-foreground">
             Create and manage content drafts for review
           </p>
         </div>
-        <Button onClick={handleNewDraft}>
+        <Button onClick={handleNewDraft} className="self-start sm:self-auto">
           <Plus className="mr-2 h-4 w-4" />
           New Draft
         </Button>

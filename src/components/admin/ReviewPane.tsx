@@ -1,53 +1,61 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Check, X, User, Eye, EyeOff } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { StatusBadge } from '@/components/common/StatusBadge'
-import { NotePreview } from '@/components/common/NotePreview'
-import { ImageRehostingOptions } from './ImageRehostingOptions'
-import { PublishDialog } from './PublishDialog'
-import { FeedbackDialog } from './FeedbackDialog'
-import { useSubmissionStore } from '@/stores/submissionStore'
-import { useUIStore } from '@/stores/uiStore'
-import { fetchProfile, getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
-import { extractImageUrls } from '@/lib/blossom'
+import { useState, useEffect } from "react";
+import { ArrowLeft, Check, X, User, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { NotePreview } from "@/components/common/NotePreview";
+import { ImageRehostingOptions } from "./ImageRehostingOptions";
+import { PublishDialog } from "./PublishDialog";
+import { FeedbackDialog } from "./FeedbackDialog";
+import { useSubmissionStore } from "@/stores/submissionStore";
+import { useUIStore } from "@/stores/uiStore";
+import {
+  fetchProfile,
+  getDisplayName,
+  formatNpub,
+  type SearchProfile,
+} from "@/services/profileSearchService";
+import { extractImageUrls } from "@/lib/blossom";
 
 interface ReviewPaneProps {
-  onBack: () => void
+  onBack: () => void;
 }
 
 export function ReviewPane({ onBack }: ReviewPaneProps) {
-  const { getCurrentSubmission, updateSubmissionContent } = useSubmissionStore()
-  const { isPublishDialogOpen, setPublishDialogOpen } = useUIStore()
+  const { getCurrentSubmission, updateSubmissionContent } =
+    useSubmissionStore();
+  const { isPublishDialogOpen, setPublishDialogOpen } = useUIStore();
 
-  const submission = getCurrentSubmission()
+  const submission = getCurrentSubmission();
 
-  const [editedContent, setEditedContent] = useState(submission?.content ?? '')
-  const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false)
-  const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
+  const [editedContent, setEditedContent] = useState(submission?.content ?? "");
+  const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(
+    null,
+  );
+  const [showPreview, setShowPreview] = useState(false);
 
   // Image and mention handling for both kind 1 and long-form submissions
-  const imageUrls = extractImageUrls(editedContent)
-  const hasImages = imageUrls.length > 0
-  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(editedContent)
-  const hasPreviewContent = hasImages || hasMentions
+  const imageUrls = extractImageUrls(editedContent);
+  const hasImages = imageUrls.length > 0;
+  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(editedContent);
+  const hasPreviewContent = hasImages || hasMentions;
 
   // Update content and persist to store
   const handleContentChange = (newContent: string) => {
-    setEditedContent(newContent)
+    setEditedContent(newContent);
     if (submission) {
-      updateSubmissionContent(submission.id, newContent)
+      updateSubmissionContent(submission.id, newContent);
     }
-  }
+  };
 
   // Fetch delegate profile
   useEffect(() => {
     if (submission?.delegatePubkey) {
-      fetchProfile(submission.delegatePubkey).then(setDelegateProfile)
+      fetchProfile(submission.delegatePubkey).then(setDelegateProfile);
     }
-  }, [submission?.delegatePubkey])
+  }, [submission?.delegatePubkey]);
 
   if (!submission) {
     return (
@@ -57,20 +65,20 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           Go back
         </Button>
       </div>
-    )
+    );
   }
 
-  const isProcessed = submission.status !== 'pending'
+  const isProcessed = submission.status !== "pending";
 
   // Extract cover image from tags
-  const coverImageTag = submission.tags.find((t) => t[0] === 'image')
-  const coverImage = coverImageTag?.[1]
+  const coverImageTag = submission.tags.find((t) => t[0] === "image");
+  const coverImage = coverImageTag?.[1];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -78,14 +86,14 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge status={submission.status} />
               <span className="text-sm text-muted-foreground">
-                Kind {submission.kind === 1 ? '1 (Note)' : '30023 (Article)'}
+                Kind {submission.kind === 1 ? "1 (Note)" : "30023 (Article)"}
               </span>
             </div>
           </div>
         </div>
 
         {!isProcessed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             <Button
               variant="outline"
               onClick={() => setFeedbackDialogOpen(true)}
@@ -119,7 +127,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Content {!isProcessed && '(Editable)'}</Label>
+              <Label>Content {!isProcessed && "(Editable)"}</Label>
               {hasPreviewContent && (
                 <Button
                   type="button"
@@ -146,15 +154,20 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               value={editedContent}
               onChange={(e) => handleContentChange(e.target.value)}
               disabled={isProcessed}
-              className={submission.kind === 30023 ? 'min-h-[400px] font-mono' : 'min-h-[200px]'}
+              className={
+                submission.kind === 30023
+                  ? "min-h-[400px] font-mono"
+                  : "min-h-[200px]"
+              }
             />
             {showPreview && hasPreviewContent && (
               <NotePreview content={editedContent} className="mt-2" />
             )}
             <p className="text-xs text-muted-foreground">
               {editedContent.length} characters
-              {editedContent !== submission.content && ' (modified)'}
-              {hasImages && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
+              {editedContent !== submission.content && " (modified)"}
+              {hasImages &&
+                ` | ${imageUrls.length} image${imageUrls.length !== 1 ? "s" : ""}`}
             </p>
           </div>
 
@@ -188,10 +201,13 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">
-                    {delegateProfile ? getDisplayName(delegateProfile) : 'Loading...'}
+                    {delegateProfile
+                      ? getDisplayName(delegateProfile)
+                      : "Loading..."}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {delegateProfile?.nip05 || formatNpub(submission.delegatePubkey)}
+                    {delegateProfile?.nip05 ||
+                      formatNpub(submission.delegatePubkey)}
                   </div>
                 </div>
               </div>
@@ -200,14 +216,27 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Received:</span>
               <p className="text-sm">
-                {new Date(submission.receivedAt).toLocaleString()}
+                {new Date(submission.receivedAt).toLocaleString("en-US", {
+                  month: "numeric",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: true,
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                })}
               </p>
             </div>
 
             {submission.note && (
               <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">Note from delegate:</span>
-                <p className="text-sm bg-muted p-2 rounded">{submission.note}</p>
+                <span className="text-sm text-muted-foreground">
+                  Note from delegate:
+                </span>
+                <p className="text-sm bg-muted p-2 rounded">
+                  {submission.note}
+                </p>
               </div>
             )}
           </div>
@@ -217,11 +246,8 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               <h3 className="font-medium">Tags</h3>
               <div className="flex flex-wrap gap-1">
                 {submission.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="text-xs bg-muted px-2 py-1 rounded"
-                  >
-                    {tag.join(': ')}
+                  <span key={i} className="text-xs bg-muted px-2 py-1 rounded">
+                    {tag.join(": ")}
                   </span>
                 ))}
               </div>
@@ -245,5 +271,5 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
         onSuccess={onBack}
       />
     </div>
-  )
+  );
 }

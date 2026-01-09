@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Trash2,
   ExternalLink,
-  Users,
   User,
   Pencil,
   Loader2,
@@ -22,6 +21,11 @@ import {
   usePublishHistoryStore,
   type PublishedItem,
 } from "@/stores/publishHistoryStore";
+import {
+  fetchProfile,
+  getDisplayName,
+  type SearchProfile,
+} from "@/services/profileSearchService";
 
 interface HistoryListProps {
   onEditArticle?: (item: PublishedItem) => void;
@@ -110,29 +114,57 @@ interface HistoryItemProps {
 }
 
 function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
+  const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (item.delegatePubkey) {
+      fetchProfile(item.delegatePubkey)
+        .then(setDelegateProfile)
+        .catch(() => setDelegateProfile(null));
+    }
+  }, [item.delegatePubkey]);
+
   const excerpt =
     item.title ||
     item.content.slice(0, 60) + (item.content.length > 60 ? "..." : "");
-  const delegateShort = item.delegateNpub
-    ? item.delegateNpub.slice(0, 12) + "..."
-    : null;
 
-  const formattedDate = new Date(item.publishedAt).toLocaleDateString("en-US", {
-    month: "short",
+  const formattedDate = new Date(item.publishedAt).toLocaleString("en-US", {
+    month: "numeric",
     day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-muted/50 group">
-      {/* Source icon */}
-      <div
-        className="shrink-0 text-muted-foreground"
-        title={item.source === "delegate" ? "From delegate" : "Direct post"}
-      >
-        {item.source === "delegate" ? (
-          <Users className="h-4 w-4" />
+      {/* Delegate profile picture or source icon */}
+      <div className="shrink-0">
+        {item.source === "delegate" && item.delegatePubkey ? (
+          delegateProfile?.picture ? (
+            <img
+              src={delegateProfile.picture}
+              alt=""
+              className="h-8 w-8 rounded-full object-cover"
+              title={`From ${getDisplayName(delegateProfile)}`}
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <User className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )
         ) : (
-          <User className="h-4 w-4" />
+          <div
+            className="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
+            title="Direct post"
+          >
+            <User className="h-4 w-4 text-muted-foreground" />
+          </div>
         )}
       </div>
 
@@ -145,7 +177,11 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
           </span>
         </div>
         <div className="text-xs text-muted-foreground">
-          {delegateShort ? `${delegateShort} • ` : ""}
+          {item.source === "delegate" && delegateProfile ? (
+            <>{getDisplayName(delegateProfile)} • </>
+          ) : item.source === "delegate" && item.delegateNpub ? (
+            <>{item.delegateNpub.slice(0, 12)}... • </>
+          ) : null}
           {formattedDate}
         </div>
       </div>

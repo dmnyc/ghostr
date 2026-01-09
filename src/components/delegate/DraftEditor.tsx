@@ -294,9 +294,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
+          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -314,7 +314,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           {isPublished && draft.publishedEventId ? (
             <Button
               variant="outline"
