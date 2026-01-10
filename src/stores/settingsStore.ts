@@ -15,6 +15,7 @@ interface SettingsStore {
   defaultRole: Role
   theme: Theme
   creditGhostr: boolean
+  enableBotNotifications: boolean
 
   // Relay configuration
   relays: RelayConfig[]
@@ -25,6 +26,7 @@ interface SettingsStore {
   setDefaultRole: (role: Role) => void
   setTheme: (theme: Theme) => void
   setCreditGhostr: (credit: boolean) => void
+  setBotNotifications: (enabled: boolean) => void
   setRelays: (relays: RelayConfig[]) => void
   addRelay: (url: string) => void
   removeRelay: (url: string) => void
@@ -45,6 +47,7 @@ export const useSettingsStore = create<SettingsStore>()(
       defaultRole: 'delegate',
       theme: 'dark',
       creditGhostr: true,
+      enableBotNotifications: true,
       relays: DEFAULT_RELAYS,
       useNIP65: true,
       nip65Relays: [],
@@ -57,6 +60,8 @@ export const useSettingsStore = create<SettingsStore>()(
       },
 
       setCreditGhostr: (credit) => set({ creditGhostr: credit }),
+
+      setBotNotifications: (enabled) => set({ enableBotNotifications: enabled }),
 
       setRelays: (relays) => set({ relays }),
 
@@ -90,6 +95,7 @@ export const useSettingsStore = create<SettingsStore>()(
         defaultRole: state.defaultRole,
         theme: state.theme,
         creditGhostr: state.creditGhostr,
+        enableBotNotifications: state.enableBotNotifications,
         relays: state.relays,
         useNIP65: state.useNIP65,
       }),

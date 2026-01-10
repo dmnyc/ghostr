@@ -20,6 +20,8 @@ import type { Submission } from '@/types/submission'
 import type { ReceiptPayload } from '@/types/receipt'
 import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
+import { sendBotNotification } from '@/lib/nostr/nip04'
+import { createApprovalNotification } from '@/lib/notifications/messageTemplates'
 
 interface PublishDialogProps {
   open: boolean
@@ -109,6 +111,17 @@ export function PublishDialog({
         }
 
         await sendGiftWrappedReceipt(submission.delegatePubkey, receipt)
+
+        // Send bot notification (fire-and-forget)
+        try {
+          const notification = await createApprovalNotification({
+            submissionId: submission.id,
+            eventId: publishedEventId,
+          })
+          sendBotNotification(submission.delegatePubkey, notification)
+        } catch (error) {
+          console.error('[PublishDialog] Bot notification error (non-critical):', error)
+        }
       } catch (receiptError) {
         console.error('Failed to send receipt:', receiptError)
         // Don't fail the whole operation if receipt fails

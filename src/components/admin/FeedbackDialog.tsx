@@ -17,6 +17,8 @@ import type { Submission } from '@/types/submission'
 import type { ReceiptPayload } from '@/types/receipt'
 import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
+import { sendBotNotification } from '@/lib/nostr/nip04'
+import { createRejectionNotification } from '@/lib/notifications/messageTemplates'
 
 interface FeedbackDialogProps {
   open: boolean
@@ -53,6 +55,17 @@ export function FeedbackDialog({
       }
 
       await sendGiftWrappedReceipt(submission.delegatePubkey, receipt)
+
+      // Send bot notification (fire-and-forget)
+      try {
+        const notification = await createRejectionNotification({
+          submissionId: submission.id,
+          feedback: feedback.trim() || undefined,
+        })
+        sendBotNotification(submission.delegatePubkey, notification)
+      } catch (error) {
+        console.error('[FeedbackDialog] Bot notification error (non-critical):', error)
+      }
 
       markAsRejected(submission.id)
 

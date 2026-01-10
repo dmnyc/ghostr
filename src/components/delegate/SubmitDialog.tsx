@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { ProfileSearchInput } from '@/components/common/ProfileSearchInput'
 import { useDraftStore } from '@/stores/draftStore'
 import { useFavoritesStore } from '@/stores/favoritesStore'
-import { npubToPubkey } from '@/stores/authStore'
+import { npubToPubkey, useAuthStore } from '@/stores/authStore'
 import { sendGiftWrappedSubmission } from '@/lib/nostr/nip59'
 import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
 import type { SubmissionPayload } from '@/types/submission'
@@ -22,6 +22,11 @@ import type { Draft } from '@/types/draft'
 import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
 import { v4 as uuid } from 'uuid'
+import { sendBotNotification } from '@/lib/nostr/nip04'
+import {
+  createNewSubmissionNotification,
+  createSubmissionReceivedNotification,
+} from '@/lib/notifications/messageTemplates'
 
 interface SubmitDialogProps {
   open: boolean
@@ -33,6 +38,7 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
   const { markAsSubmitted, saveDraft } = useDraftStore()
   const { favorites, isLoaded, loadFavorites, addFavorite, removeFavorite, isFavorite } =
     useFavoritesStore()
+  const { user } = useAuthStore()
 
   const [publisherNpub, setPublisherNpub] = useState('')
   const [selectedProfile, setSelectedProfile] = useState<SearchProfile | null>(null)
@@ -140,6 +146,28 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
       }
 
       await sendGiftWrappedSubmission(publisherPubkey, payload)
+
+      // Send bot notifications (fire-and-forget, don't block)
+      try {
+        const publisherNotification = await createNewSubmissionNotification({
+          delegatePubkey: user?.pubkey,
+          delegateName: selectedProfile?.displayName || selectedProfile?.name,
+          submissionId,
+          contentPreview: draft.content,
+        })
+        sendBotNotification(publisherPubkey, publisherNotification)
+
+        if (user?.pubkey) {
+          const delegateNotification = await createSubmissionReceivedNotification({
+            publisherPubkey,
+            publisherName: selectedProfile?.displayName || selectedProfile?.name,
+            submissionId,
+          })
+          sendBotNotification(user.pubkey, delegateNotification)
+        }
+      } catch (error) {
+        console.error('[SubmitDialog] Bot notification error (non-critical):', error)
+      }
 
       markAsSubmitted(draft.id, publisherNpub.trim(), submissionId)
       // Save draft in background - don't block the UI

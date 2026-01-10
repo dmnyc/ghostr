@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
+import { isBotEnabled, getBotPubkey } from '@/lib/ndk/botSigner'
 
 export function SettingsPage() {
   const { setCurrentView } = useUIStore()
@@ -19,6 +20,8 @@ export function SettingsPage() {
     setDefaultRole,
     creditGhostr,
     setCreditGhostr,
+    enableBotNotifications,
+    setBotNotifications,
     relays,
     addRelay,
     removeRelay,
@@ -29,6 +32,7 @@ export function SettingsPage() {
 
   const [newRelayUrl, setNewRelayUrl] = useState('')
   const [isLoadingNIP65, setIsLoadingNIP65] = useState(false)
+  const [botPubkey, setBotPubkey] = useState<string | null>(null)
 
   // Fetch NIP-65 relays on mount if user is logged in
   useEffect(() => {
@@ -36,6 +40,11 @@ export function SettingsPage() {
       loadNIP65Relays()
     }
   }, [user?.pubkey])
+
+  // Load bot pubkey on mount
+  useEffect(() => {
+    getBotPubkey().then(setBotPubkey)
+  }, [])
 
   const loadNIP65Relays = async () => {
     if (!user) return
@@ -113,6 +122,38 @@ export function SettingsPage() {
             <Switch
               checked={creditGhostr}
               onCheckedChange={setCreditGhostr}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notifications</CardTitle>
+          <CardDescription>
+            Configure how you receive notifications
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="bot-notifications">Bot Notifications</Label>
+              <p className="text-sm text-muted-foreground">
+                Receive DM notifications from the Ghostr bot
+                {isBotEnabled() ? ' (Compatible with all Nostr clients)' : ' (Not configured)'}
+              </p>
+              {botPubkey && (
+                <p className="text-xs text-muted-foreground font-mono">
+                  Bot: {botPubkey.slice(0, 16)}...
+                </p>
+              )}
+            </div>
+            <Switch
+              id="bot-notifications"
+              checked={enableBotNotifications && isBotEnabled()}
+              onCheckedChange={setBotNotifications}
+              disabled={!isBotEnabled()}
             />
           </div>
         </CardContent>

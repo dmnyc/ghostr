@@ -35,6 +35,7 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **Draft Management** - Local caching + relay sync via NIP-37
 - **Publish History** - Track all published content
 - **Favorite Publishers** - Quick access to frequent collaborators
+- **Bot Notifications** - Optional cross-client compatible DM notifications
 
 ## Tech Stack
 
@@ -67,6 +68,39 @@ npm run dev
 # Build for production
 npm run build
 ```
+
+## Bot Notifications
+
+Ghostr includes an optional notification bot that sends cross-client compatible DM notifications.
+
+### Why Bot Notifications?
+
+The primary communication method (NIP-59 gift wrap) works perfectly in Ghostr but has limited support in other Nostr clients:
+- **Keychat:** Shows notification but not message body
+- **Damus/Primal:** No notification at all
+
+The bot sends supplemental NIP-04 encrypted DMs that work across all major clients.
+
+### Setup
+
+1. Use the vanity bot keypair: `npub1gh0strl6djhzj2h7rcvzx7x902uc5esdd7gwhkv4599aqz8m4pys8ryan3`
+2. Create `.env` file:
+   ```env
+   VITE_BOT_NSEC=nsec1...your_bot_nsec_here
+   ```
+3. Rebuild: `npm run build`
+
+### Security
+
+The bot operates client-side and its nsec is included in the application bundle. This is acceptable because:
+- Bot only sends notifications (no data access)
+- Bot has no special privileges
+- Users can disable notifications in settings
+- Bot can be muted/blocked like any Nostr user
+
+### Configuration
+
+Users can enable/disable bot notifications in Settings → Notifications.
 
 ## Authentication
 
