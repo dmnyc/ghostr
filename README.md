@@ -36,6 +36,7 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **Publish History** - Track all published content
 - **Favorite Publishers** - Quick access to frequent collaborators
 - **Bot Notifications** - Optional cross-client compatible DM notifications
+- **Follow Management** - Safe follow/unfollow with automatic data preservation
 
 ## Tech Stack
 
@@ -47,7 +48,8 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 
 ## Nostr NIPs Used
 
-- **NIP-01** - Basic protocol (kind 1 notes)
+- **NIP-01** - Basic protocol (kind 1 notes, kind 3 contacts)
+- **NIP-04** - Encrypted DMs (bot notifications)
 - **NIP-07** - Browser extension signing
 - **NIP-23** - Long-form content (kind 30023)
 - **NIP-37** - Draft storage (one event per draft, encrypted)
@@ -100,7 +102,19 @@ The bot operates client-side and its nsec is included in the application bundle.
 
 ### Configuration
 
-Users can enable/disable bot notifications in Settings → Notifications.
+Users can manage bot notifications in Settings → Notifications:
+- Enable/disable bot DM notifications
+- View bot profile with avatar and name
+- Copy bot npub for use in other clients
+- Follow/unfollow the bot directly from settings
+
+### Follow Management
+
+The bot follow feature includes safeguards to prevent accidental data loss:
+- Fetches current follow list before making changes
+- Preserves all existing follows when adding/removing
+- Uses fetch-merge-publish pattern for safety
+- Displays current follow state with visual feedback
 
 ## Authentication
 
