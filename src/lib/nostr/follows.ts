@@ -35,7 +35,7 @@ export async function fetchFollowList(): Promise<Set<string>> {
     // Extract pubkeys from 'p' tags
     const followedPubkeys = latestEvent.tags
       .filter(tag => tag[0] === 'p' && tag[1])
-      .map(tag => tag[1])
+      .map(tag => tag[1]!)
 
     console.log('[Follows] Found', followedPubkeys.length, 'follows')
     return new Set(followedPubkeys)

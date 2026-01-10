@@ -1,8 +1,9 @@
-import { useMemo, useState, useEffect, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { extractImageUrls } from '@/lib/blossom'
-import { fetchProfile, type SearchProfile } from '@/services/profileSearchService'
+import { type SearchProfile } from '@/services/profileSearchService'
 import { nip19 } from 'nostr-tools'
+import { useProfileQueries } from '@/hooks/queries/useProfileQuery'
 
 // Extract all nostr:npub mentions from content
 function extractNpubMentions(content: string): string[] {
@@ -18,42 +19,47 @@ function extractNpubMentions(content: string): string[] {
   return matches
 }
 
-// Hook to fetch profiles for npub mentions
+// Hook to fetch profiles for npub mentions using React Query
+// Benefits: automatic caching, deduplication, background updates
 function useMentionProfiles(content: string) {
-  const [profiles, setProfiles] = useState<Map<string, SearchProfile>>(new Map())
-  const [loading, setLoading] = useState(false)
-
   const npubs = useMemo(() => extractNpubMentions(content), [content])
 
-  useEffect(() => {
-    if (npubs.length === 0) return
-
-    setLoading(true)
-    const fetchAll = async () => {
-      const newProfiles = new Map<string, SearchProfile>()
-
-      await Promise.all(
-        npubs.map(async (npub) => {
-          try {
-            const decoded = nip19.decode(npub)
-            if (decoded.type === 'npub') {
-              const profile = await fetchProfile(decoded.data)
-              if (profile) {
-                newProfiles.set(npub, profile)
-              }
-            }
-          } catch {
-            // Ignore invalid npubs
-          }
-        })
-      )
-
-      setProfiles(newProfiles)
-      setLoading(false)
-    }
-
-    fetchAll()
+  // Convert npubs to pubkeys
+  const pubkeys = useMemo(() => {
+    return npubs
+      .map((npub) => {
+        try {
+          const decoded = nip19.decode(npub)
+          return decoded.type === 'npub' ? decoded.data : null
+        } catch {
+          return null
+        }
+      })
+      .filter((p): p is string => p !== null)
   }, [npubs])
+
+  // Use React Query to fetch all profiles in parallel with automatic deduplication
+  const { profiles: profilesArray, isLoading: loading } = useProfileQueries(pubkeys)
+
+  // Convert back to Map<npub, profile> for rendering
+  const profiles = useMemo(() => {
+    const map = new Map<string, SearchProfile>()
+    profilesArray.forEach((profile) => {
+      // Find the npub that corresponds to this profile
+      const npub = npubs.find((n) => {
+        try {
+          const decoded = nip19.decode(n)
+          return decoded.type === 'npub' && decoded.data === profile.pubkey
+        } catch {
+          return false
+        }
+      })
+      if (npub) {
+        map.set(npub, profile)
+      }
+    })
+    return map
+  }, [profilesArray, npubs])
 
   return { profiles, loading, hasMentions: npubs.length > 0 }
 }

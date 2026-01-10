@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
 import { User, Loader2 } from 'lucide-react'
-import { fetchProfile, type SearchProfile } from '@/services/profileSearchService'
 import { cn } from '@/lib/utils/cn'
+import { useProfileQuery } from '@/hooks/queries/useProfileQuery'
 
 interface ProfileDisplayProps {
   pubkey: string
@@ -18,29 +17,8 @@ export function ProfileDisplay({
   showName = true,
   className,
 }: ProfileDisplayProps) {
-  const [profile, setProfile] = useState<SearchProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-
-    fetchProfile(pubkey)
-      .then((p) => {
-        if (!cancelled) {
-          setProfile(p)
-          setLoading(false)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [pubkey])
+  // Use React Query for automatic caching, deduplication, and background updates
+  const { data: profile, isLoading: loading } = useProfileQuery(pubkey)
 
   const sizeClasses = {
     sm: {

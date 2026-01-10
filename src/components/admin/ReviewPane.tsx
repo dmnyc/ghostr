@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, Check, X, User, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,12 +11,11 @@ import { FeedbackDialog } from "./FeedbackDialog";
 import { useSubmissionStore } from "@/stores/submissionStore";
 import { useUIStore } from "@/stores/uiStore";
 import {
-  fetchProfile,
   getDisplayName,
   formatNpub,
-  type SearchProfile,
 } from "@/services/profileSearchService";
 import { extractImageUrls } from "@/lib/blossom";
+import { useProfileQuery } from "@/hooks/queries/useProfileQuery";
 
 interface ReviewPaneProps {
   onBack: () => void;
@@ -31,10 +30,10 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
   const [editedContent, setEditedContent] = useState(submission?.content ?? "");
   const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
-  const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(
-    null,
-  );
   const [showPreview, setShowPreview] = useState(false);
+
+  // Fetch delegate profile using React Query (automatic caching and deduplication)
+  const { data: delegateProfile } = useProfileQuery(submission?.delegatePubkey);
 
   // Image and mention handling for both kind 1 and long-form submissions
   const imageUrls = extractImageUrls(editedContent);
@@ -49,13 +48,6 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
       updateSubmissionContent(submission.id, newContent);
     }
   };
-
-  // Fetch delegate profile
-  useEffect(() => {
-    if (submission?.delegatePubkey) {
-      fetchProfile(submission.delegatePubkey).then(setDelegateProfile);
-    }
-  }, [submission?.delegatePubkey]);
 
   if (!submission) {
     return (
