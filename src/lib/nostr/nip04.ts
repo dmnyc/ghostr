@@ -29,9 +29,8 @@ export async function sendBotDM(
   try {
     const recipient = new NDKUser({ pubkey: recipientPubkey })
 
-    // Encrypt the message using NIP-04
-    // Note: NDK's signer.encrypt() should use NIP-04 for kind 4 events
-    const encryptedContent = await botSigner.encrypt(recipient, message)
+    // Encrypt the message using NIP-04 (required for kind 4 DMs)
+    const encryptedContent = await botSigner.encrypt(recipient, message, 'nip04')
 
     // Create kind 4 event
     const dmEvent = new NDKEvent(ndk)

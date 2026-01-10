@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Plus, Trash2, Wifi, WifiOff, BookOpen, Pencil } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Wifi, WifiOff, BookOpen, Pencil, Copy, Check, UserPlus, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,11 @@ import { useUIStore } from '@/stores/uiStore'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { isBotEnabled, getBotPubkey } from '@/lib/ndk/botSigner'
+import { fetchProfile, getDisplayName } from '@/services/profileSearchService'
+import { nip19 } from 'nostr-tools'
+import type { SearchProfile } from '@/services/profileSearchService'
+import { isFollowing, followUser, unfollowUser } from '@/lib/nostr/follows'
+import { toast } from '@/hooks/useToast'
 
 export function SettingsPage() {
   const { setCurrentView } = useUIStore()
@@ -33,6 +38,10 @@ export function SettingsPage() {
   const [newRelayUrl, setNewRelayUrl] = useState('')
   const [isLoadingNIP65, setIsLoadingNIP65] = useState(false)
   const [botPubkey, setBotPubkey] = useState<string | null>(null)
+  const [botProfile, setBotProfile] = useState<SearchProfile | null>(null)
+  const [copiedNpub, setCopiedNpub] = useState(false)
+  const [isFollowingBot, setIsFollowingBot] = useState(false)
+  const [isFollowLoading, setIsFollowLoading] = useState(false)
 
   // Fetch NIP-65 relays on mount if user is logged in
   useEffect(() => {
@@ -41,10 +50,31 @@ export function SettingsPage() {
     }
   }, [user?.pubkey])
 
-  // Load bot pubkey on mount
+  // Load bot pubkey and profile on mount
   useEffect(() => {
-    getBotPubkey().then(setBotPubkey)
-  }, [])
+    const loadBotInfo = async () => {
+      const pubkey = await getBotPubkey()
+      if (pubkey) {
+        setBotPubkey(pubkey)
+        const profile = await fetchProfile(pubkey)
+        if (profile) {
+          setBotProfile(profile)
+        }
+        // Check if user is following the bot
+        if (user) {
+          try {
+            console.log('[SettingsPage] Checking follow status for bot:', pubkey.slice(0, 8))
+            const following = await isFollowing(pubkey)
+            console.log('[SettingsPage] Is following bot:', following)
+            setIsFollowingBot(following)
+          } catch (error) {
+            console.error('[SettingsPage] Error checking follow status:', error)
+          }
+        }
+      }
+    }
+    loadBotInfo()
+  }, [user])
 
   const loadNIP65Relays = async () => {
     if (!user) return
@@ -69,6 +99,62 @@ export function SettingsPage() {
   const normalizeUrl = (url: string) => url.replace(/\/+$/, '')
   const isRelayConnected = (url: string) =>
     connectedRelays.some(r => normalizeUrl(r) === normalizeUrl(url))
+
+  const handleCopyNpub = async () => {
+    if (!botPubkey) return
+    const npub = nip19.npubEncode(botPubkey)
+    await navigator.clipboard.writeText(npub)
+    setCopiedNpub(true)
+    setTimeout(() => setCopiedNpub(false), 2000)
+  }
+
+  const handleToggleFollow = async () => {
+    if (!botPubkey || !user) return
+
+    setIsFollowLoading(true)
+    try {
+      if (isFollowingBot) {
+        const success = await unfollowUser(botPubkey)
+        if (success) {
+          setIsFollowingBot(false)
+          toast({
+            title: 'Unfollowed',
+            description: 'You have unfollowed the Ghostr bot',
+          })
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Failed to unfollow. Please try again.',
+            variant: 'destructive',
+          })
+        }
+      } else {
+        const success = await followUser(botPubkey)
+        if (success) {
+          setIsFollowingBot(true)
+          toast({
+            title: 'Following',
+            description: 'You are now following the Ghostr bot',
+          })
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Failed to follow. Please try again.',
+            variant: 'destructive',
+          })
+        }
+      }
+    } catch (error) {
+      console.error('[SettingsPage] Follow toggle error:', error)
+      toast({
+        title: 'Error',
+        description: 'An error occurred. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsFollowLoading(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -135,19 +221,14 @@ export function SettingsPage() {
             Configure how you receive notifications
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label htmlFor="bot-notifications">Bot Notifications</Label>
+              <Label htmlFor="bot-notifications">Enable Bot Notifications</Label>
               <p className="text-sm text-muted-foreground">
                 Receive DM notifications from the Ghostr bot
                 {isBotEnabled() ? ' (Compatible with all Nostr clients)' : ' (Not configured)'}
               </p>
-              {botPubkey && (
-                <p className="text-xs text-muted-foreground font-mono">
-                  Bot: {botPubkey.slice(0, 16)}...
-                </p>
-              )}
             </div>
             <Switch
               id="bot-notifications"
@@ -156,6 +237,67 @@ export function SettingsPage() {
               disabled={!isBotEnabled()}
             />
           </div>
+
+          {botPubkey && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              <img
+                src={botProfile?.picture || `https://api.dicebear.com/7.x/identicon/svg?seed=${botPubkey}`}
+                alt={botProfile?.name || 'Bot'}
+                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                onError={(e) => {
+                  e.currentTarget.src = `https://api.dicebear.com/7.x/identicon/svg?seed=${botPubkey}`
+                }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">
+                  {botProfile ? getDisplayName(botProfile) : 'Ghostr Bot'}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyNpub}
+                  className="h-8 px-3 text-xs"
+                >
+                  {copiedNpub ? (
+                    <>
+                      <Check className="h-3 w-3 mr-1.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3 mr-1.5" />
+                      Copy npub
+                    </>
+                  )}
+                </Button>
+                {user && (
+                  <Button
+                    variant={isFollowingBot ? "outline" : "default"}
+                    size="sm"
+                    onClick={handleToggleFollow}
+                    disabled={isFollowLoading}
+                    className="h-8 px-3 text-xs"
+                  >
+                    {isFollowLoading ? (
+                      'Loading...'
+                    ) : isFollowingBot ? (
+                      <>
+                        <UserMinus className="h-3 w-3 mr-1.5" />
+                        Unfollow
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-3 w-3 mr-1.5" />
+                        Follow
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
