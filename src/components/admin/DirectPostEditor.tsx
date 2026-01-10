@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
+import { MentionTextarea } from '@/components/common/MentionTextarea'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { ImageUploadButton } from '@/components/common/ImageUploadButton'
 import { NotePreviewWithRemove } from '@/components/common/NotePreview'
@@ -238,12 +238,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 placeholder="Write your article here..."
               />
             ) : (
-              <Textarea
-                id="content"
-                placeholder="What do you want to say?"
+              <MentionTextarea
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="min-h-[200px]"
+                onChange={setContent}
+                placeholder="What do you want to say? Type @ to mention someone..."
+                minHeight="200px"
               />
             )}
             {!isLongForm && showPreview && hasImages && (
