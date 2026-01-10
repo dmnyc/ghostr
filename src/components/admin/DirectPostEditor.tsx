@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { MarkdownEditor } from '@/components/common/MarkdownEditor'
-import { MentionTextarea } from '@/components/common/MentionTextarea'
+import { MentionPillTextarea } from '@/components/common/MentionPillTextarea'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { ImageUploadButton } from '@/components/common/ImageUploadButton'
 import { NotePreviewWithRemove } from '@/components/common/NotePreview'
@@ -238,7 +238,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 placeholder="Write your article here..."
               />
             ) : (
-              <MentionTextarea
+              <MentionPillTextarea
                 value={content}
                 onChange={setContent}
                 placeholder="What do you want to say? Type @ to mention someone..."

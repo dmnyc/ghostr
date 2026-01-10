@@ -1,9 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { extractImageUrls } from '@/lib/blossom'
 import { type SearchProfile } from '@/services/profileSearchService'
 import { nip19 } from 'nostr-tools'
 import { useProfileQueries } from '@/hooks/queries/useProfileQuery'
+import { renderTextWithMentions } from '@/lib/mentionUtils'
 
 // Extract all nostr:npub mentions from content
 function extractNpubMentions(content: string): string[] {
@@ -41,7 +42,7 @@ function useMentionProfiles(content: string) {
   // Use React Query to fetch all profiles in parallel with automatic deduplication
   const { profiles: profilesArray, isLoading: loading } = useProfileQueries(pubkeys)
 
-  // Convert back to Map<npub, profile> for rendering
+  // Convert back to Map<nostr:npub, profile> for rendering (with nostr: prefix)
   const profiles = useMemo(() => {
     const map = new Map<string, SearchProfile>()
     profilesArray.forEach((profile) => {
@@ -55,7 +56,8 @@ function useMentionProfiles(content: string) {
         }
       })
       if (npub) {
-        map.set(npub, profile)
+        // Store with nostr: prefix to match renderTextWithMentions format
+        map.set(`nostr:${npub}`, profile)
       }
     })
     return map
@@ -64,7 +66,7 @@ function useMentionProfiles(content: string) {
   return { profiles, loading, hasMentions: npubs.length > 0 }
 }
 
-// Render content with mentions replaced by profile names
+// Render content with mentions as visual pills
 function ContentWithMentions({ content, profiles }: { content: string; profiles: Map<string, SearchProfile> }) {
   // Remove image URLs from the display text
   const imageUrls = extractImageUrls(content)
@@ -73,41 +75,8 @@ function ContentWithMentions({ content, profiles }: { content: string; profiles:
     displayText = displayText.replace(url, '').trim()
   })
 
-  // Replace nostr:npub mentions with profile names
-  const parts: ReactNode[] = []
-  const regex = /nostr:(npub1[a-zA-Z0-9]{58})/g
-  let lastIndex = 0
-  let match
-
-  while ((match = regex.exec(displayText)) !== null) {
-    // Add text before the match
-    if (match.index > lastIndex) {
-      parts.push(displayText.slice(lastIndex, match.index))
-    }
-
-    // Add the mention
-    const npub = match[1]
-    if (npub) {
-      const profile = profiles.get(npub)
-      const displayName = profile?.displayName || profile?.name || `${npub.slice(0, 12)}...`
-
-      parts.push(
-        <span
-          key={match.index}
-          className="text-primary font-medium"
-        >
-          @{displayName}
-        </span>
-      )
-    }
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // Add remaining text
-  if (lastIndex < displayText.length) {
-    parts.push(displayText.slice(lastIndex))
-  }
+  // Use renderTextWithMentions to show pills
+  const parts = renderTextWithMentions(displayText, profiles)
 
   if (parts.length === 0 || displayText.trim() === '') {
     return null

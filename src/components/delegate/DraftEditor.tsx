@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { MarkdownEditor } from "@/components/common/MarkdownEditor";
-import { MentionTextarea } from "@/components/common/MentionTextarea";
+import { MentionPillTextarea } from "@/components/common/MentionPillTextarea";
 import { ProfileSearchInput } from "@/components/common/ProfileSearchInput";
 import { CoverImageInput } from "@/components/common/CoverImageInput";
 import { ImageUploadButton } from "@/components/common/ImageUploadButton";
@@ -421,7 +421,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 disabled={isSubmittedOrPublished}
               />
             ) : (
-              <MentionTextarea
+              <MentionPillTextarea
                 value={content}
                 onChange={handleContentChange}
                 placeholder="What do you want to say? Use @ to mention someone..."
