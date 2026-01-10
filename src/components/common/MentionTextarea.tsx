@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback, forwardRef } from 'react'
 import { Loader2, User } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
-import { useProfileSearch } from '@/hooks/useProfileSearch'
+import { useProfileSearch } from '@/hooks/queries/useProfileQuery'
 import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
 import { nip19 } from 'nostr-tools'
 import { cn } from '@/lib/utils/cn'
+import { useDebounce } from '@/hooks/useDebounce'
 
 interface MentionTextareaProps {
   value: string
@@ -38,12 +39,17 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
     const [mentionMatch, setMentionMatch] = useState<MentionMatch | null>(null)
     const [highlightedIndex, setHighlightedIndex] = useState(-1)
     const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
+    const [searchQuery, setSearchQuery] = useState('')
 
     const internalRef = useRef<HTMLTextAreaElement>(null)
     const textareaRef = (ref as React.RefObject<HTMLTextAreaElement>) || internalRef
     const listRef = useRef<HTMLDivElement>(null)
 
-    const { results, isLoading, search, clear } = useProfileSearch(300)
+    // Debounce search query for React Query
+    const debouncedQuery = useDebounce(searchQuery, 300)
+
+    // Use React Query for profile search with automatic caching
+    const { data: results = [], isLoading } = useProfileSearch(debouncedQuery)
 
     // Detect @mention pattern
     const detectMention = useCallback(() => {
@@ -62,7 +68,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
         const endIndex = cursorPos
 
         setMentionMatch({ query, startIndex, endIndex })
-        search(query)
+        setSearchQuery(query)
         setIsOpen(true)
 
         // Calculate popover position
@@ -70,9 +76,9 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
       } else {
         setMentionMatch(null)
         setIsOpen(false)
-        clear()
+        setSearchQuery('')
       }
-    }, [value, search, clear, textareaRef])
+    }, [value, textareaRef])
 
     // Update popover position based on cursor
     const updatePopoverPosition = (textarea: HTMLTextAreaElement, startIndex: number) => {
@@ -158,7 +164,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
         onChange(newValue)
         setIsOpen(false)
         setMentionMatch(null)
-        clear()
+        setSearchQuery('')
 
         // Move cursor after the inserted mention
         setTimeout(() => {
@@ -170,7 +176,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           }
         }, 0)
       },
-      [mentionMatch, value, onChange, clear, textareaRef]
+      [mentionMatch, value, onChange, textareaRef]
     )
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -199,7 +205,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           e.preventDefault()
           setIsOpen(false)
           setMentionMatch(null)
-          clear()
+          setSearchQuery('')
           break
         case 'Tab': {
           const tabProfile = results[highlightedIndex]
