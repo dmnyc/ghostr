@@ -64,7 +64,6 @@ export function MarkdownEditor({
 
   // Image upload state
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { results, isLoading, search, clear } = useProfileSearch(300);
@@ -183,14 +182,12 @@ export function MarkdownEditor({
     }
 
     setIsUploadingImage(true);
-    setUploadProgress(0);
 
     try {
       const result = await uploadToBlossom(
         file,
         signer,
-        undefined, // Use default server
-        (progress) => setUploadProgress(progress.percent)
+        undefined // Use default server
       );
 
       // Get selected text for alt attribute
@@ -218,7 +215,6 @@ export function MarkdownEditor({
       });
     } finally {
       setIsUploadingImage(false);
-      setUploadProgress(0);
     }
   }, [value, insertMarkdown, signer]);
 
