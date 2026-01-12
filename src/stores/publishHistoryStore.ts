@@ -7,6 +7,7 @@ export interface PublishedItem {
   content: string
   kind: 1 | 30023
   title?: string // For long-form articles
+  summary?: string // Optional summary for kind 30023 (NIP-23)
   dTag?: string // For long-form articles (used for republishing)
   coverImage?: string // Cover image URL
   publishedAt: number

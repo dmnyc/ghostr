@@ -4,28 +4,43 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { useDraftStore } from '@/stores/draftStore'
 import type { Draft } from '@/types/draft'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from '@/hooks/useToast'
+import { useState } from 'react'
 
 interface DraftCardProps {
   draft: Draft
 }
 
 export function DraftCard({ draft }: DraftCardProps) {
-  const { setCurrentDraft, deleteDraft, archiveDraft, saveDraft } = useDraftStore()
+  const { setCurrentDraft, deleteDraft, archiveDraft } = useDraftStore()
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleView = () => {
     setCurrentDraft(draft.id)
   }
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this draft?')) {
-      await deleteDraft(draft.id)
-    }
+    setShowDeleteDialog(false)
+    await deleteDraft(draft.id)
+    toast({
+      title: 'Draft deleted',
+      description: 'Your draft has been permanently deleted.',
+    })
   }
 
   const handleArchive = async () => {
     if (window.confirm('Archive this submission? It will be hidden from your drafts list.')) {
-      archiveDraft(draft.id)
-      await saveDraft(draft.id)
+      await archiveDraft(draft.id)
     }
   }
 
@@ -49,7 +64,7 @@ export function DraftCard({ draft }: DraftCardProps) {
           <div className="flex items-center gap-2 min-w-0">
             <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
             <h3 className="font-medium truncate">
-              {draft.title || 'Untitled Draft'}
+              {draft.title || (draft.targetKind === 1 ? 'Short Note Draft' : 'Untitled Draft')}
             </h3>
           </div>
           <StatusBadge status={draft.status} />
@@ -78,7 +93,7 @@ export function DraftCard({ draft }: DraftCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleDelete}
+            onClick={() => setShowDeleteDialog(true)}
             title="Delete draft"
           >
             <Trash2 className="h-4 w-4" />
@@ -95,6 +110,23 @@ export function DraftCard({ draft }: DraftCardProps) {
           </Button>
         )}
       </CardFooter>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this draft from both your local storage and relays. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

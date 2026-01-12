@@ -44,7 +44,7 @@ export function ArchivedList() {
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-medium truncate">
-                  {draft.title || 'Untitled Draft'}
+                  {draft.title || (draft.targetKind === 1 ? 'Short Note Draft' : 'Untitled Draft')}
                 </h3>
                 <StatusBadge status={draft.status} />
               </div>

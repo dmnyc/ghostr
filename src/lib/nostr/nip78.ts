@@ -69,7 +69,7 @@ interface StoredHistoryItem {
   id: string
   kind: 1 | 30023
   title?: string
-  summary?: string // First 100 chars of content
+  summary?: string // User-provided summary or first 100 chars of content
   dTag?: string
   coverImage?: string
   publishedAt: number
@@ -83,7 +83,8 @@ function toStoredItem(item: PublishedItem): StoredHistoryItem {
     id: item.id,
     kind: item.kind,
     title: item.title,
-    summary: item.content.slice(0, 100),
+    // Use provided summary, or fallback to first 100 chars of content
+    summary: item.summary || item.content.slice(0, 100),
     dTag: item.dTag,
     coverImage: item.coverImage,
     publishedAt: item.publishedAt,
@@ -98,6 +99,7 @@ function fromStoredItem(stored: StoredHistoryItem): PublishedItem {
     id: stored.id,
     kind: stored.kind,
     title: stored.title,
+    summary: stored.summary,
     content: stored.summary || '', // Will be empty/truncated, can fetch full from relay if needed
     dTag: stored.dTag,
     coverImage: stored.coverImage,

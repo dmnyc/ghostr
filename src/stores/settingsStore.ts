@@ -98,6 +98,7 @@ export const useSettingsStore = create<SettingsStore>()(
         enableBotNotifications: state.enableBotNotifications,
         relays: state.relays,
         useNIP65: state.useNIP65,
+        nip65Relays: state.nip65Relays,
       }),
     }
   )

@@ -122,7 +122,7 @@ interface DraftStore {
   markAsRejected: (id: string, reason?: string) => void
   dismissRejection: (id: string) => void
   dismissAllRejections: () => void
-  archiveDraft: (id: string) => void
+  archiveDraft: (id: string) => Promise<void>
   clearDrafts: () => void
 }
 
@@ -378,16 +378,29 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
     set({ unseenRejectionIds: new Set() })
   },
 
-  archiveDraft: (id) => {
+  archiveDraft: async (id) => {
+    const { drafts } = get()
+    const draft = drafts.find((d) => d.id === id)
+    if (!draft) return
+
+    // Update local state and cache immediately
     set((state) => {
-      const newDrafts = state.drafts.map((draft) =>
-        draft.id === id
-          ? { ...draft, archived: true, updatedAt: Date.now() }
-          : draft
+      const newDrafts = state.drafts.map((d) =>
+        d.id === id
+          ? { ...d, archived: true, updatedAt: Date.now() }
+          : d
       )
       saveDraftsToCache(newDrafts)
       return { drafts: newDrafts }
     })
+
+    // Persist to relay in background
+    try {
+      const updatedDraft = { ...draft, archived: true, updatedAt: Date.now() }
+      await saveDraftNIP37(updatedDraft)
+    } catch (error) {
+      console.error('[DraftStore] Failed to save archived status to relay:', error)
+    }
   },
 
   clearDrafts: () => {

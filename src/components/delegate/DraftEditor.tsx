@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft,
   Save,
@@ -8,9 +8,9 @@ import {
   X,
   User,
   Check,
-  Eye,
-  EyeOff,
   AlertCircle,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,23 @@ import { MentionPillTextarea } from "@/components/common/MentionPillTextarea";
 import { ProfileSearchInput } from "@/components/common/ProfileSearchInput";
 import { CoverImageInput } from "@/components/common/CoverImageInput";
 import { ImageUploadButton } from "@/components/common/ImageUploadButton";
-import { NotePreviewWithRemove } from "@/components/common/NotePreview";
+import { ImageThumbnailGrid } from "@/components/common/ImageThumbnailGrid";
+import { LinkPreviewGrid } from "@/components/common/LinkPreviewGrid";
 import { SubmitDialog } from "./SubmitDialog";
 import { useDraftStore } from "@/stores/draftStore";
 import { useFavoritesStore } from "@/stores/favoritesStore";
 import { useUIStore } from "@/stores/uiStore";
 import { toast } from "@/hooks/useToast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   getDisplayName,
@@ -36,13 +47,14 @@ import {
 } from "@/services/profileSearchService";
 import type { DraftPublisher } from "@/types/draft";
 import { extractImageUrls } from "@/lib/blossom";
+import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
 
 interface DraftEditorProps {
   onBack: () => void;
 }
 
 export function DraftEditor({ onBack }: DraftEditorProps) {
-  const { currentDraftId, drafts, updateDraft, saveDraft, isSaving } =
+  const { currentDraftId, drafts, updateDraft, saveDraft, deleteDraft, isSaving } =
     useDraftStore();
   const {
     favorites,
@@ -57,6 +69,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   // Find draft by ID to avoid creating new object references
   const draft = drafts.find((d) => d.id === currentDraftId);
 
+  // Track which draft ID we've initialized to prevent re-initialization on auto-save
+  const initializedDraftId = useRef<string | null>(null);
+
   const [title, setTitle] = useState(draft?.title ?? "");
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
@@ -67,30 +82,125 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [publisherSearch, setPublisherSearch] = useState("");
   const [selectedPublisher, setSelectedPublisher] =
     useState<DraftPublisher | null>(draft?.targetPublisher ?? null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [lastRelaySave, setLastRelaySave] = useState<number | null>(null);
 
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true);
 
-  // Image and mention handling for kind 1 notes
+  // Stable callback for MarkdownEditor onChange
+  const handleMarkdownChange = useCallback((val: string) => {
+    setContent(val);
+    setHasChanges(true);
+  }, []);
+
+  // Extract URLs from draft content on load (only once per draft)
+  useEffect(() => {
+    if (!draft || !currentDraftId) return;
+
+    // Only initialize if this is a different draft than last time
+    if (initializedDraftId.current === currentDraftId) {
+      return;  // Already initialized this draft
+    }
+
+    // Mark this draft as initialized
+    initializedDraftId.current = currentDraftId;
+
+    if (!isLongForm) {
+      const allUrls = extractAllUrls(draft.content);
+
+      // Restore uploaded images separately (these should show as thumbnails)
+      if (draft.uploadedImages && draft.uploadedImages.length > 0) {
+        setAttachedImages(draft.uploadedImages);
+      }
+
+      if (allUrls.length > 0) {
+        // Clear previous state
+        setAttachedLinks([]);
+
+        // Track which URLs to remove from content
+        const urlsToRemove: string[] = [];
+
+        // Process each URL - separate uploaded images from pasted URLs
+        allUrls.forEach(async (url) => {
+          // Check if this is an uploaded image (in uploadedImages array)
+          const isUploadedImage = draft.uploadedImages?.includes(url);
+
+          if (isUploadedImage) {
+            // Skip - already handled by setAttachedImages above
+            urlsToRemove.push(url);
+          } else if (isImageUrl(url)) {
+            // Pasted image URL - show as link preview with placeholder
+            setAttachedLinks(prev => [...prev, { url, loading: false }]);
+            urlsToRemove.push(url);
+          } else {
+            // Regular URL - fetch metadata and show as link preview
+            setAttachedLinks(prev => [...prev, { url, loading: true }]);
+            const metadata = await fetchLinkMetadata(url);
+            setAttachedLinks(prev =>
+              prev.map(l => l.url === url ? metadata : l)
+            );
+            urlsToRemove.push(url);
+          }
+        });
+
+        // Remove URLs from content for clean editing
+        let cleanContent = draft.content;
+        urlsToRemove.forEach(url => {
+          // Escape special regex characters in URL
+          const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Remove the URL and one newline before/after if present
+          cleanContent = cleanContent.replace(new RegExp(`\n${escapedUrl}`, 'g'), '');
+          cleanContent = cleanContent.replace(new RegExp(`${escapedUrl}\n`, 'g'), '');
+          cleanContent = cleanContent.replace(new RegExp(escapedUrl, 'g'), '');
+        });
+        // Clean up any remaining double newlines from URL removal
+        cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n');
+        setContent(cleanContent.trim());
+      } else {
+        // No URLs, just set content as-is
+        setContent(draft.content);
+      }
+    } else {
+      // Long form, set content as-is
+      setContent(draft.content);
+    }
+  }, [currentDraftId, isLongForm]);
+
+  // Image handling for kind 1 notes
   const imageUrls = extractImageUrls(content);
-  const hasImages = imageUrls.length > 0;
-  const hasMentions = /nostr:npub1[a-zA-Z0-9]{58}/.test(content);
-  const hasPreviewContent = hasImages || hasMentions;
+  const hasImages = imageUrls.length > 0 || attachedImages.length > 0;
 
   const handleImageUpload = (url: string) => {
-    // Append image URL to content with newline
-    setContent(
-      (prev) => prev + (prev.endsWith("\n") || prev === "" ? "" : "\n") + url,
-    );
+    if (isLongForm) {
+      // For long-form articles, keep the old behavior (append to content)
+      setContent(
+        (prev) => prev + (prev.endsWith("\n") || prev === "" ? "" : "\n") + url,
+      );
+    } else {
+      // For kind 1 notes, add to separate state array
+      setAttachedImages((prev) => [...prev, url]);
+    }
     setHasChanges(true);
   };
 
   const handleRemoveImage = (url: string) => {
-    // Remove the image URL from content
-    setContent((prev) =>
-      prev.replace(url, "").replace(/\n\n+/g, "\n\n").trim(),
-    );
+    if (isLongForm) {
+      // For long-form articles, remove from content
+      setContent((prev) =>
+        prev.replace(url, "").replace(/\n\n+/g, "\n\n").trim(),
+      );
+    } else {
+      // For kind 1 notes, remove from state array
+      setAttachedImages((prev) => prev.filter((u) => u !== url));
+    }
+    setHasChanges(true);
+  };
+
+  const handleRemoveLink = (url: string) => {
+    setAttachedLinks((prev) => prev.filter((l) => l.url !== url));
     setHasChanges(true);
   };
 
@@ -101,10 +211,20 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     }
   }, [favoritesLoaded, loadFavorites]);
 
-  // Auto-save with debounce (saves to both store and relay)
-  const debouncedContent = useDebounce(content, 1000);
-  const debouncedTitle = useDebounce(title, 1000);
+  // Two-tier auto-save system:
+  // - Fast local save (1s): Updates Zustand store + localStorage for quick UI feedback
+  // - Slower relay save (3s): Publishes to Nostr relays, preventing spam and reducing network usage
+  const debouncedContentLocal = useDebounce(content, 1000);
+  const debouncedTitleLocal = useDebounce(title, 1000);
+  const debouncedImagesLocal = useDebounce(attachedImages, 1000);
+  const debouncedLinksLocal = useDebounce(attachedLinks, 1000);
 
+  const debouncedContentRelay = useDebounce(content, 3000);
+  const debouncedTitleRelay = useDebounce(title, 3000);
+  const debouncedImagesRelay = useDebounce(attachedImages, 3000);
+  const debouncedLinksRelay = useDebounce(attachedLinks, 3000);
+
+  // Local auto-save (1 second debounce) - updates store and localStorage
   useEffect(() => {
     // Skip the initial mount
     if (isInitialMount.current) {
@@ -113,27 +233,64 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     }
 
     if (currentDraftId && hasChanges) {
+      // For kind 1 notes, append images and links at the end
+      let finalContent = debouncedContentLocal.trim();
+
+      if (!isLongForm) {
+        if (debouncedImagesLocal.length > 0) {
+          finalContent += '\n\n' + debouncedImagesLocal.join('\n');
+        }
+        if (debouncedLinksLocal.length > 0) {
+          finalContent += '\n\n' + debouncedLinksLocal.map(l => l.url).join('\n');
+        }
+      }
+
       updateDraft(currentDraftId, {
-        title: debouncedTitle,
-        content: debouncedContent,
+        title: debouncedTitleLocal,
+        content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
-      });
-      // Also persist to relay (fire and forget)
-      saveDraft(currentDraftId).catch(() => {
-        // Silently fail - will retry on next change
+        uploadedImages: !isLongForm && debouncedImagesLocal.length > 0 ? debouncedImagesLocal : undefined,
       });
     }
   }, [
-    debouncedContent,
-    debouncedTitle,
+    debouncedContentLocal,
+    debouncedTitleLocal,
+    debouncedImagesLocal,
+    debouncedLinksLocal,
     isLongForm,
     coverImage,
     selectedPublisher,
     currentDraftId,
     hasChanges,
     updateDraft,
+  ]);
+
+  // Relay auto-save (3 second debounce) - publishes to Nostr relays
+  useEffect(() => {
+    // Skip the initial mount
+    if (isInitialMount.current) {
+      return;
+    }
+
+    if (currentDraftId && hasChanges) {
+      // Also persist to relay (fire and forget)
+      saveDraft(currentDraftId)
+        .then(() => {
+          setLastRelaySave(Date.now());
+        })
+        .catch(() => {
+          // Silently fail - will retry on next change
+        });
+    }
+  }, [
+    debouncedContentRelay,
+    debouncedTitleRelay,
+    debouncedImagesRelay,
+    debouncedLinksRelay,
+    currentDraftId,
+    hasChanges,
     saveDraft,
   ]);
 
@@ -145,6 +302,35 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const handleContentChange = (value: string) => {
     setContent(value);
     setHasChanges(true);
+
+    // Only detect links for kind 1 notes
+    if (!isLongForm) {
+      // Detect ALL URLs (including image URLs) for link previews
+      const allUrls = extractAllUrls(value);
+      const existingLinkUrls = attachedLinks.map(l => l.url);
+      const newLinkUrls = allUrls.filter(url => !existingLinkUrls.includes(url));
+
+      // Add new URLs as link previews
+      newLinkUrls.forEach(async (url) => {
+        // For image URLs, show placeholder without fetching metadata
+        if (isImageUrl(url)) {
+          setAttachedLinks(prev => [...prev, { url, loading: false }]);
+        } else {
+          // For regular URLs, fetch metadata
+          setAttachedLinks(prev => [...prev, { url, loading: true }]);
+          const metadata = await fetchLinkMetadata(url);
+          setAttachedLinks(prev =>
+            prev.map(l => l.url === url ? metadata : l)
+          );
+        }
+      });
+
+      // Remove links that were deleted from content
+      const removedLinkUrls = existingLinkUrls.filter(url => !allUrls.includes(url));
+      if (removedLinkUrls.length > 0) {
+        setAttachedLinks(prev => prev.filter(l => !removedLinkUrls.includes(l.url)));
+      }
+    }
   };
 
   const handleKindChange = (checked: boolean) => {
@@ -200,12 +386,25 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const handleSave = async () => {
     if (!draft) return;
 
+    // For kind 1 notes, append images and links at the end
+    let finalContent = content.trim();
+
+    if (!isLongForm) {
+      if (attachedImages.length > 0) {
+        finalContent += '\n\n' + attachedImages.join('\n');
+      }
+      if (attachedLinks.length > 0) {
+        finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n');
+      }
+    }
+
     updateDraft(draft.id, {
       title,
-      content,
+      content: finalContent,
       targetKind: isLongForm ? 30023 : 1,
       targetPublisher: selectedPublisher ?? undefined,
       coverImage: isLongForm ? coverImage : undefined,
+      uploadedImages: !isLongForm && attachedImages.length > 0 ? attachedImages : undefined,
     });
 
     await saveDraft(draft.id);
@@ -234,15 +433,39 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     await saveDraft(draft.id);
   };
 
+  const handleDelete = async () => {
+    if (!currentDraftId) return;
+    setShowDeleteDialog(false);
+    await deleteDraft(currentDraftId);
+    toast({
+      title: 'Draft deleted',
+      description: 'Your draft has been permanently deleted.',
+    });
+    onBack();
+  };
+
   const handleBack = async () => {
     // Save before going back if there are changes
     if (draft && hasChanges) {
+      // For kind 1 notes, append images and links at the end
+      let finalContent = content.trim();
+
+      if (!isLongForm) {
+        if (attachedImages.length > 0) {
+          finalContent += '\n\n' + attachedImages.join('\n');
+        }
+        if (attachedLinks.length > 0) {
+          finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n');
+        }
+      }
+
       updateDraft(draft.id, {
         title,
-        content,
+        content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
+        uploadedImages: !isLongForm && attachedImages.length > 0 ? attachedImages : undefined,
       });
       await saveDraft(draft.id).catch(() => {
         // Silently fail
@@ -330,6 +553,23 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </Button>
           ) : (
             <>
+              {draft.status === 'draft' && lastRelaySave && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-2">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Saved to relays</span>
+                </div>
+              )}
+              {draft.status === 'draft' && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleSave}
@@ -384,65 +624,44 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             <div className="flex items-center justify-between">
               <Label htmlFor="content">Content</Label>
               {!isLongForm && !isSubmittedOrPublished && (
-                <div className="flex items-center gap-2">
-                  <ImageUploadButton onUpload={handleImageUpload} />
-                  {hasPreviewContent && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPreview(!showPreview)}
-                      className="gap-2"
-                    >
-                      {showPreview ? (
-                        <>
-                          <EyeOff className="h-4 w-4" />
-                          Hide Preview
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4" />
-                          Preview
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
+                <ImageUploadButton onUpload={handleImageUpload} />
               )}
             </div>
             {isLongForm ? (
               <MarkdownEditor
                 value={content}
-                onChange={(val) => {
-                  setContent(val);
-                  setHasChanges(true);
-                }}
+                onChange={handleMarkdownChange}
                 placeholder="Write your article here..."
                 disabled={isSubmittedOrPublished}
               />
             ) : (
-              <MentionPillTextarea
-                value={content}
-                onChange={handleContentChange}
-                placeholder="What do you want to say? Use @ to mention someone..."
-                disabled={isSubmittedOrPublished}
-                minHeight="200px"
-              />
-            )}
-            {!isLongForm && showPreview && hasPreviewContent && (
-              <NotePreviewWithRemove
-                content={content}
-                onRemoveImage={
-                  isSubmittedOrPublished ? () => {} : handleRemoveImage
-                }
-                className="mt-2"
-              />
+              <>
+                <MentionPillTextarea
+                  value={content}
+                  onChange={handleContentChange}
+                  placeholder="What do you want to say? Use @ to mention someone..."
+                  disabled={isSubmittedOrPublished}
+                  minHeight="200px"
+                />
+                {/* Show thumbnail grid for kind 1 notes */}
+                <ImageThumbnailGrid
+                  images={attachedImages}
+                  onRemove={handleRemoveImage}
+                  disabled={isSubmittedOrPublished}
+                />
+                {/* Show link previews for kind 1 notes */}
+                <LinkPreviewGrid
+                  links={attachedLinks}
+                  onRemove={handleRemoveLink}
+                  disabled={isSubmittedOrPublished}
+                />
+              </>
             )}
             <p className="text-xs text-muted-foreground">
               {content.length} characters
               {hasImages &&
                 !isLongForm &&
-                ` | ${imageUrls.length} image${imageUrls.length !== 1 ? "s" : ""}`}
+                ` | ${attachedImages.length} image${attachedImages.length !== 1 ? "s" : ""}`}
             </p>
           </div>
         </div>
@@ -624,6 +843,23 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         onOpenChange={setSubmitDialogOpen}
         draft={draft}
       />
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this draft from both your local storage and relays. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

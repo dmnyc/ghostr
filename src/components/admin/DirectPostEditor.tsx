@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Send, Loader2, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Send, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,7 +8,8 @@ import { MarkdownEditor } from '@/components/common/MarkdownEditor'
 import { MentionPillTextarea } from '@/components/common/MentionPillTextarea'
 import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { ImageUploadButton } from '@/components/common/ImageUploadButton'
-import { NotePreviewWithRemove } from '@/components/common/NotePreview'
+import { ImageThumbnailGrid } from '@/components/common/ImageThumbnailGrid'
+import { LinkPreviewGrid } from '@/components/common/LinkPreviewGrid'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -16,6 +17,7 @@ import { usePublishHistoryStore } from '@/stores/publishHistoryStore'
 import { toast } from '@/hooks/useToast'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
 import { extractImageUrls } from '@/lib/blossom'
+import { extractLinkUrls, fetchLinkMetadata, type LinkMetadata } from '@/lib/urlUtils'
 
 interface DirectPostEditorProps {
   onBack: () => void
@@ -29,24 +31,67 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const { addItem } = usePublishHistoryStore()
 
   const [title, setTitle] = useState('')
+  const [summary, setSummary] = useState('')
   const [content, setContent] = useState('')
   const [isLongForm, setIsLongForm] = useState(false)
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
-  const [showPreview, setShowPreview] = useState(false)
+  const [attachedImages, setAttachedImages] = useState<string[]>([])
+  const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([])
 
   const imageUrls = extractImageUrls(content)
-  const hasImages = imageUrls.length > 0
+  const hasImages = imageUrls.length > 0 || attachedImages.length > 0
 
   const handleImageUpload = (url: string) => {
-    // Append image URL to content with newline
-    setContent((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + url)
+    if (isLongForm) {
+      // For long-form articles, keep the old behavior (append to content)
+      setContent((prev) => prev + (prev.endsWith('\n') || prev === '' ? '' : '\n') + url)
+    } else {
+      // For kind 1 notes, add to separate state array
+      setAttachedImages((prev) => [...prev, url])
+    }
   }
 
   const handleRemoveImage = (url: string) => {
-    // Remove the image URL from content
-    setContent((prev) => prev.replace(url, '').replace(/\n\n+/g, '\n\n').trim())
+    if (isLongForm) {
+      // For long-form articles, remove from content
+      setContent((prev) => prev.replace(url, '').replace(/\n\n+/g, '\n\n').trim())
+    } else {
+      // For kind 1 notes, remove from state array
+      setAttachedImages((prev) => prev.filter((u) => u !== url))
+    }
+  }
+
+  const handleRemoveLink = (url: string) => {
+    setAttachedLinks((prev) => prev.filter((l) => l.url !== url))
+  }
+
+  const handleContentChange = (value: string) => {
+    setContent(value)
+
+    // Only detect links for kind 1 notes
+    if (!isLongForm) {
+      // Detect new link URLs pasted/typed
+      const linkUrls = extractLinkUrls(value)
+      const existingUrls = attachedLinks.map(l => l.url)
+      const newUrls = linkUrls.filter(url => !existingUrls.includes(url))
+
+      // Fetch metadata for new URLs
+      newUrls.forEach(async (url) => {
+        setAttachedLinks(prev => [...prev, { url, loading: true }])
+        const metadata = await fetchLinkMetadata(url)
+        setAttachedLinks(prev =>
+          prev.map(l => l.url === url ? metadata : l)
+        )
+      })
+
+      // Remove links that were deleted from content
+      const removedUrls = existingUrls.filter(url => !linkUrls.includes(url))
+      if (removedUrls.length > 0) {
+        setAttachedLinks(prev => prev.filter(l => !removedUrls.includes(l.url)))
+      }
+    }
   }
 
   const handlePublish = async () => {
@@ -73,7 +118,20 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
     try {
       const event = new NDKEvent(ndk)
       event.kind = isLongForm ? 30023 : 1
-      event.content = content
+
+      // For kind 1 notes, append attached images and links at the end
+      let finalContent = content.trim()
+
+      if (!isLongForm) {
+        if (attachedImages.length > 0) {
+          finalContent += '\n\n' + attachedImages.join('\n')
+        }
+        if (attachedLinks.length > 0) {
+          finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n')
+        }
+      }
+
+      event.content = finalContent
 
       const tags: string[][] = []
       let dTag: string | undefined
@@ -91,6 +149,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           ['title', title],
           ['published_at', Math.floor(Date.now() / 1000).toString()]
         )
+
+        // Add summary tag if set (NIP-23)
+        if (summary.trim()) {
+          tags.push(['summary', summary])
+        }
 
         // Add cover image tag if set
         if (coverImage) {
@@ -111,9 +174,10 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       // Add to publish history
       addItem({
         id: event.id,
-        content,
+        content: finalContent,
         kind: isLongForm ? 30023 : 1,
         title: isLongForm ? title : undefined,
+        summary: isLongForm && summary.trim() ? summary : undefined,
         dTag: isLongForm ? dTag : undefined,
         coverImage: isLongForm ? coverImage : undefined,
         publishedAt: Date.now(),
@@ -127,8 +191,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
       // Reset form
       setTitle('')
+      setSummary('')
       setContent('')
       setCoverImage(undefined)
+      setAttachedImages([])
+      setAttachedLinks([])
 
       onPublished?.()
       onBack()
@@ -195,6 +262,22 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           )}
 
           {isLongForm && (
+            <div className="space-y-2">
+              <Label htmlFor="summary">Summary (optional)</Label>
+              <Input
+                id="summary"
+                placeholder="Brief description of your article (recommended for discovery)"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                maxLength={200}
+              />
+              <p className="text-xs text-muted-foreground">
+                {summary.length}/200 characters - Helps readers discover your article
+              </p>
+            </div>
+          )}
+
+          {isLongForm && (
             <CoverImageInput
               value={coverImage}
               onChange={setCoverImage}
@@ -204,32 +287,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="content">Content</Label>
-              {!isLongForm && (
-                <div className="flex items-center gap-2">
-                  <ImageUploadButton onUpload={handleImageUpload} />
-                  {hasImages && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPreview(!showPreview)}
-                      className="gap-2"
-                    >
-                      {showPreview ? (
-                        <>
-                          <EyeOff className="h-4 w-4" />
-                          Hide Preview
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4" />
-                          Preview
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              )}
+              {!isLongForm && <ImageUploadButton onUpload={handleImageUpload} />}
             </div>
             {isLongForm ? (
               <MarkdownEditor
@@ -238,23 +296,30 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 placeholder="Write your article here..."
               />
             ) : (
-              <MentionPillTextarea
-                value={content}
-                onChange={setContent}
-                placeholder="What do you want to say? Type @ to mention someone..."
-                minHeight="200px"
-              />
-            )}
-            {!isLongForm && showPreview && hasImages && (
-              <NotePreviewWithRemove
-                content={content}
-                onRemoveImage={handleRemoveImage}
-                className="mt-2"
-              />
+              <>
+                <MentionPillTextarea
+                  value={content}
+                  onChange={handleContentChange}
+                  placeholder="What do you want to say? Type @ to mention someone..."
+                  minHeight="200px"
+                />
+                {/* Show thumbnail grid for kind 1 notes */}
+                <ImageThumbnailGrid
+                  images={attachedImages}
+                  onRemove={handleRemoveImage}
+                  disabled={isPublishing}
+                />
+                {/* Show link previews for kind 1 notes */}
+                <LinkPreviewGrid
+                  links={attachedLinks}
+                  onRemove={handleRemoveLink}
+                  disabled={isPublishing}
+                />
+              </>
             )}
             <p className="text-xs text-muted-foreground">
               {content.length} characters
-              {hasImages && !isLongForm && ` | ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}`}
+              {hasImages && !isLongForm && ` | ${attachedImages.length} image${attachedImages.length !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>

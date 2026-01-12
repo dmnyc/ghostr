@@ -31,6 +31,7 @@ interface DraftPayload {
   rejectionReason?: string
   coverImage?: string
   archived?: boolean
+  uploadedImages?: string[]
 }
 
 function draftToPayload(draft: Draft): DraftPayload {
@@ -48,6 +49,7 @@ function draftToPayload(draft: Draft): DraftPayload {
     rejectionReason: draft.rejectionReason,
     coverImage: draft.coverImage,
     archived: draft.archived,
+    uploadedImages: draft.uploadedImages,
   }
 }
 
@@ -67,6 +69,7 @@ function payloadToDraft(id: string, payload: DraftPayload): Draft {
     rejectionReason: payload.rejectionReason,
     coverImage: payload.coverImage,
     archived: payload.archived,
+    uploadedImages: payload.uploadedImages,
   }
 }
 
