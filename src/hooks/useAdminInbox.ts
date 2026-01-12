@@ -21,7 +21,8 @@ export function useAdminInbox(idsReady: boolean = true) {
     }
 
     const subscribe = async () => {
-      setLoading(true)
+      // Don't show loading spinner - processed IDs are already loaded from localStorage
+      // The inbox will update in real-time as events arrive
 
       // Clean up existing subscription
       if (subscriptionRef.current) {
@@ -58,21 +59,20 @@ export function useAdminInbox(idsReady: boolean = true) {
             return
           }
 
+          // Use submittedAt from payload if available (accurate), otherwise fall back to event timestamp (randomized)
+          const timestamp = payload.submittedAt || event.created_at || Math.floor(Date.now() / 1000)
+
           const submission = submissionFromPayload(
             payload,
             unwrapped.senderPubkey,
             event.id,
-            unwrapped.createdAt
+            timestamp
           )
 
           addSubmission(submission)
         } catch (error) {
           console.error('Failed to process gift wrap:', error)
         }
-      })
-
-      sub.on('eose', () => {
-        setLoading(false)
       })
     }
 

@@ -6,6 +6,7 @@ export interface SubmissionPayload {
   kind: 1 | 30023
   tags: string[][]
   note: string
+  submittedAt?: number // Unix timestamp in seconds when submitted (added for accurate timestamps)
 }
 
 export interface Submission {

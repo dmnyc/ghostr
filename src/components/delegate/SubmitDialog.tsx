@@ -153,6 +153,7 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
         kind: draft.targetKind,
         tags,
         note: note.trim(),
+        submittedAt: Math.floor(Date.now() / 1000), // Actual submission time
       }
 
       await sendGiftWrappedSubmission(publisherPubkey, payload)
