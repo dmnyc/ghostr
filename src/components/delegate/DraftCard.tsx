@@ -1,4 +1,4 @@
-import { FileText, Trash2, Archive } from 'lucide-react'
+import { FileText, Trash2, Archive, RotateCcw } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
@@ -19,10 +19,11 @@ import { useState } from 'react'
 
 interface DraftCardProps {
   draft: Draft
+  isArchived?: boolean
 }
 
-export function DraftCard({ draft }: DraftCardProps) {
-  const { setCurrentDraft, deleteDraft, archiveDraft } = useDraftStore()
+export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
+  const { setCurrentDraft, deleteDraft, archiveDraft, updateDraft, saveDraft } = useDraftStore()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleView = () => {
@@ -41,7 +42,20 @@ export function DraftCard({ draft }: DraftCardProps) {
   const handleArchive = async () => {
     if (window.confirm('Archive this submission? It will be hidden from your drafts list.')) {
       await archiveDraft(draft.id)
+      toast({
+        title: 'Draft archived',
+        description: 'Your draft has been moved to the archive.',
+      })
     }
+  }
+
+  const handleUnarchive = async () => {
+    updateDraft(draft.id, { archived: false })
+    await saveDraft(draft.id)
+    toast({
+      title: 'Draft restored',
+      description: 'Your draft has been moved back to the drafts list.',
+    })
   }
 
   const isSubmitted = draft.status === 'submitted'
@@ -58,7 +72,7 @@ export function DraftCard({ draft }: DraftCardProps) {
   })
 
   return (
-    <Card className="flex flex-col hover:shadow-md transition-shadow">
+    <Card className={`flex flex-col hover:shadow-md transition-shadow ${isArchived ? 'opacity-75' : ''}`}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -67,7 +81,7 @@ export function DraftCard({ draft }: DraftCardProps) {
               {draft.title || (draft.targetKind === 1 ? 'Short Note Draft' : 'Untitled Draft')}
             </h3>
           </div>
-          <StatusBadge status={draft.status} />
+          {!isArchived && <StatusBadge status={draft.status} />}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Kind {draft.targetKind === 1 ? '1 (Note)' : '30023 (Article)'}</span>
@@ -81,33 +95,57 @@ export function DraftCard({ draft }: DraftCardProps) {
       </CardContent>
 
       <CardFooter className="gap-2">
-        <Button
-          variant="default"
-          size="sm"
-          className="flex-1"
-          onClick={handleView}
-        >
-          {isSubmitted ? 'View' : 'Edit'}
-        </Button>
-        {draft.status === 'draft' && (
+        {isArchived ? (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={() => setShowDeleteDialog(true)}
-            title="Delete draft"
+            className="flex-1 gap-2"
+            onClick={handleUnarchive}
           >
-            <Trash2 className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" />
+            Restore
           </Button>
-        )}
-        {isSubmitted && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleArchive}
-            title="Archive submission"
-          >
-            <Archive className="h-4 w-4" />
-          </Button>
+        ) : (
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              className="flex-1"
+              onClick={handleView}
+            >
+              {isSubmitted ? 'View' : 'Edit'}
+            </Button>
+            {draft.status === 'draft' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  title="Delete draft"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleArchive}
+                  title="Archive draft"
+                >
+                  <Archive className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {isSubmitted && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleArchive}
+                title="Archive submission"
+              >
+                <Archive className="h-4 w-4" />
+              </Button>
+            )}
+          </>
         )}
       </CardFooter>
 

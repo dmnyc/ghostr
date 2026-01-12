@@ -61,7 +61,9 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       let match: RegExpExecArray | null
 
       while ((match = regex.exec(value)) !== null) {
-        npubs.push(match[1]) // Extract just the npub part
+        if (match[1]) {
+          npubs.push(match[1]) // Extract just the npub part
+        }
       }
 
       // Convert npubs to pubkeys
@@ -321,6 +323,25 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       [contentEditableRef]
     )
 
+    // Handle paste events to prevent image pastes
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      // Check if any item is an image
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item && item.type.startsWith('image/')) {
+          e.preventDefault()
+          // Show a toast message directing user to the upload button
+          if (window.confirm('Image pasting is not supported. Please use the Upload Image button instead.')) {
+            // User acknowledged
+          }
+          return
+        }
+      }
+    }
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       const selection = window.getSelection()
       if (!selection || !selection.rangeCount) return
@@ -433,6 +454,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onBeforeInput={handleBeforeInput}
+          onPaste={handlePaste}
           onClick={() => { hasUserInteracted.current = true }}
           onFocus={() => { hasUserInteracted.current = true }}
           contentEditable={!disabled}

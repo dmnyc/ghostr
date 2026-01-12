@@ -14,6 +14,9 @@ interface ImageRehostingOptionsProps {
   content: string
   onContentChange: (newContent: string) => void
   disabled?: boolean
+  originalContent?: string  // Original submission content to identify delegate-provided images
+  coverImageUrl?: string  // Cover image URL from tags (for kind 30023)
+  onCoverImageChange?: (newUrl: string) => void  // Callback when cover image is rehosted
 }
 
 interface ImageStatus {
@@ -28,12 +31,19 @@ export function ImageRehostingOptions({
   content,
   onContentChange,
   disabled,
+  originalContent,
+  coverImageUrl,
+  onCoverImageChange,
 }: ImageRehostingOptionsProps) {
   const { signer } = useAuthStore()
-  // Store original URLs once on mount - don't recalculate from content
+  // Store original delegate-provided URLs once on mount
+  // Use originalContent if provided (delegate submission), otherwise use current content
+  // Also include cover image URL if provided
   const originalUrlsRef = useRef<string[] | null>(null)
   if (originalUrlsRef.current === null) {
-    originalUrlsRef.current = extractImageUrls(content)
+    const contentUrls = extractImageUrls(originalContent || content)
+    const coverUrls = coverImageUrl ? [coverImageUrl] : []
+    originalUrlsRef.current = [...contentUrls, ...coverUrls]
   }
   const originalUrls = originalUrlsRef.current
 
@@ -76,7 +86,12 @@ export function ImageRehostingOptions({
       }))
 
       // Update content with new URL (use ref for latest content)
-      onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
+      // If this is the cover image, update it separately
+      if (originalUrl === coverImageUrl && onCoverImageChange) {
+        onCoverImageChange(result.url)
+      } else {
+        onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
+      }
 
       toast({
         title: 'Image re-uploaded',
@@ -133,7 +148,12 @@ export function ImageRehostingOptions({
       }))
 
       // Update content with new URL (use ref for latest content)
-      onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
+      // If this is the cover image, update it separately
+      if (originalUrl === coverImageUrl && onCoverImageChange) {
+        onCoverImageChange(result.url)
+      } else {
+        onContentChange(replaceImageUrl(contentRef.current, originalUrl, result.url))
+      }
 
       toast({
         title: 'Image uploaded',
@@ -177,7 +197,13 @@ export function ImageRehostingOptions({
       return
     }
 
-    onContentChange(replaceImageUrl(contentRef.current, originalUrl, status.customUrl))
+    // If this is the cover image, update it separately
+    if (originalUrl === coverImageUrl && onCoverImageChange) {
+      onCoverImageChange(status.customUrl)
+    } else {
+      onContentChange(replaceImageUrl(contentRef.current, originalUrl, status.customUrl))
+    }
+
     setImageStatuses((prev) => ({
       ...prev,
       [originalUrl]: { ...prev[originalUrl]!, status: 'done', newUrl: status.customUrl },

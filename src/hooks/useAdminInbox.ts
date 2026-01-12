@@ -8,14 +8,15 @@ import type { SubmissionPayload } from '@/types/submission'
 
 const GIFT_WRAP_KIND = 1059
 
-export function useAdminInbox() {
+export function useAdminInbox(idsReady: boolean = true) {
   const { ndk } = useNDKStore()
   const { user, isAuthenticated } = useAuthStore()
   const { addSubmission, isProcessed, setLoading } = useSubmissionStore()
   const subscriptionRef = useRef<NDKSubscription | null>(null)
 
   useEffect(() => {
-    if (!ndk || !user || !isAuthenticated) {
+    // Wait for archived/processed IDs to be loaded before subscribing
+    if (!ndk || !user || !isAuthenticated || !idsReady) {
       return
     }
 
@@ -83,5 +84,5 @@ export function useAdminInbox() {
         subscriptionRef.current = null
       }
     }
-  }, [ndk, user, isAuthenticated, addSubmission, isProcessed, setLoading])
+  }, [ndk, user, isAuthenticated, idsReady, addSubmission, isProcessed, setLoading])
 }

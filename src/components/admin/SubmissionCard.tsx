@@ -17,8 +17,8 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
     setCurrentSubmission(submission.id)
   }
 
-  const handleArchive = () => {
-    archiveSubmission(submission.id)
+  const handleArchive = async () => {
+    await archiveSubmission(submission.id)
   }
 
   const excerpt = submission.content

@@ -108,7 +108,7 @@ export async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
     // Fallback to title tag if no og:title
     if (!metadata.title) {
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-      if (titleMatch) {
+      if (titleMatch && titleMatch[1]) {
         metadata.title = titleMatch[1].trim()
       }
     }

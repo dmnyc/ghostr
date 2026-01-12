@@ -238,3 +238,61 @@ const DEFAULT_RELAYS = [
 ### Components
 - `CoverImageInput` - Upload + URL paste input
 - Integrated in DraftEditor and DirectPostEditor (long-form only)
+
+---
+
+## Future Enhancements
+
+### Image Paste Support
+**Current Behavior:**
+- Pasting images directly into `MentionPillTextarea` is blocked
+- Shows alert: "Image pasting is not supported. Please use the Upload Image button instead."
+- Prevents broken/inaccessible images from being inserted
+
+**Desired Future Behavior:**
+- Intercept paste events containing images
+- Upload pasted images to Blossom automatically
+- Insert the resulting Blossom URL into content
+- Show upload progress indicator
+
+**Implementation Notes:**
+- Add `onPaste` handler to `MentionPillTextarea`
+- Detect `ClipboardEvent.clipboardData.items` with type `image/*`
+- Extract image file from clipboard
+- Upload to Blossom via `uploadToBlossom(file, signer)`
+- Insert resulting URL at cursor position
+- Handle upload errors gracefully
+
+**Affected Components:**
+- `src/components/common/MentionPillTextarea.tsx`
+- `src/lib/blossom.ts` (upload utilities)
+
+### Image URL Visibility in Editors
+**Current Behavior:**
+- When using the "Upload Image" button, the image URL is appended to the content text
+- Both uploaded URLs and pasted URLs appear in the content editor
+- Image thumbnails are shown separately below the content
+
+**Desired Behavior:**
+- Uploaded image URLs (via Upload Image button) should NOT appear in the content text
+- Only manually typed/pasted URLs should be visible in the content editor
+- Uploaded images should only appear as thumbnails
+- When publishing, all image URLs (uploaded + pasted) should be included in the final content
+
+**Implementation Notes:**
+- Track uploaded images separately from pasted URLs using `uploadedImages` array
+- Filter out `uploadedImages` from the visible content in the editor
+- When publishing or submitting, merge `uploadedImages` back into the content
+- DraftEditor already has partial implementation (lines 128-133) that removes uploaded images from display
+- Need to extend this pattern to:
+  - ReviewPane (publisher review)
+  - DirectPostEditor (publisher direct posts)
+  - PublishDialog (final content assembly)
+
+**Affected Components:**
+- `src/components/delegate/DraftEditor.tsx`
+- `src/components/admin/ReviewPane.tsx`
+- `src/components/admin/DirectPostEditor.tsx`
+- `src/components/admin/PublishDialog.tsx`
+- `src/types/draft.ts` (Draft.uploadedImages)
+- `src/types/submission.ts` (may need uploadedImages field)

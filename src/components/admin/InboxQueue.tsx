@@ -11,7 +11,9 @@ interface InboxQueueProps {
 export function InboxQueue({ isLoading }: InboxQueueProps) {
   const { submissions } = useSubmissionStore()
 
-  const pendingSubmissions = submissions.filter((s) => s.status === 'pending')
+  const pendingSubmissions = submissions
+    .filter((s) => s.status === 'pending')
+    .sort((a, b) => b.receivedAt - a.receivedAt) // Newest first
 
   if (isLoading) {
     return <LoadingState />

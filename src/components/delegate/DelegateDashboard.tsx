@@ -6,7 +6,6 @@ import { DraftList } from './DraftList'
 import { DraftEditor } from './DraftEditor'
 import { DelegateHistoryList } from './DelegateHistoryList'
 import { RejectedList } from './RejectedList'
-import { ArchivedList } from './ArchivedList'
 import { useDraftStore } from '@/stores/draftStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useDelegateReceipts } from '@/hooks/useDelegateReceipts'
@@ -51,7 +50,6 @@ export function DelegateDashboard() {
   const rejectedDrafts = drafts.filter((d) => d.status === 'rejected' && !d.archived)
   const publishedCount = drafts.filter((d) => d.status === 'published').length
   const rejectedCount = rejectedDrafts.length
-  const archivedCount = drafts.filter((d) => d.archived).length
 
   // Get unseen rejected drafts for the banner
   const unseenRejectedDrafts = rejectedDrafts.filter((d) => unseenRejectionIds.has(d.id))
@@ -130,9 +128,6 @@ export function DelegateDashboard() {
           <TabsTrigger value="published">
             Published {publishedCount > 0 && `(${publishedCount})`}
           </TabsTrigger>
-          <TabsTrigger value="archived">
-            Archived {archivedCount > 0 && `(${archivedCount})`}
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="drafts" className="mt-4">
@@ -145,10 +140,6 @@ export function DelegateDashboard() {
 
         <TabsContent value="published" className="mt-4">
           <DelegateHistoryList />
-        </TabsContent>
-
-        <TabsContent value="archived" className="mt-4">
-          <ArchivedList />
         </TabsContent>
       </Tabs>
     </div>

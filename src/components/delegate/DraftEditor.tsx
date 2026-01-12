@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { MarkdownEditor } from "@/components/common/MarkdownEditor";
 import { MentionPillTextarea } from "@/components/common/MentionPillTextarea";
@@ -48,6 +47,7 @@ import {
 import type { DraftPublisher } from "@/types/draft";
 import { extractImageUrls } from "@/lib/blossom";
 import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
+import { cn } from "@/lib/utils/cn";
 
 interface DraftEditorProps {
   onBack: () => void;
@@ -73,6 +73,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const initializedDraftId = useRef<string | null>(null);
 
   const [title, setTitle] = useState(draft?.title ?? "");
+  const [summary, setSummary] = useState(draft?.summary ?? "");
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
   const [coverImage, setCoverImage] = useState<string | undefined>(
@@ -216,11 +217,13 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   // - Slower relay save (3s): Publishes to Nostr relays, preventing spam and reducing network usage
   const debouncedContentLocal = useDebounce(content, 1000);
   const debouncedTitleLocal = useDebounce(title, 1000);
+  const debouncedSummaryLocal = useDebounce(summary, 1000);
   const debouncedImagesLocal = useDebounce(attachedImages, 1000);
   const debouncedLinksLocal = useDebounce(attachedLinks, 1000);
 
   const debouncedContentRelay = useDebounce(content, 3000);
   const debouncedTitleRelay = useDebounce(title, 3000);
+  const debouncedSummaryRelay = useDebounce(summary, 3000);
   const debouncedImagesRelay = useDebounce(attachedImages, 3000);
   const debouncedLinksRelay = useDebounce(attachedLinks, 3000);
 
@@ -238,15 +241,16 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
       if (!isLongForm) {
         if (debouncedImagesLocal.length > 0) {
-          finalContent += '\n\n' + debouncedImagesLocal.join('\n');
+          finalContent += '\n' + debouncedImagesLocal.join('\n');
         }
         if (debouncedLinksLocal.length > 0) {
-          finalContent += '\n\n' + debouncedLinksLocal.map(l => l.url).join('\n');
+          finalContent += '\n' + debouncedLinksLocal.map(l => l.url).join('\n');
         }
       }
 
       updateDraft(currentDraftId, {
         title: debouncedTitleLocal,
+        summary: isLongForm && debouncedSummaryLocal.trim() ? debouncedSummaryLocal : undefined,
         content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
@@ -257,6 +261,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   }, [
     debouncedContentLocal,
     debouncedTitleLocal,
+    debouncedSummaryLocal,
     debouncedImagesLocal,
     debouncedLinksLocal,
     isLongForm,
@@ -287,6 +292,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   }, [
     debouncedContentRelay,
     debouncedTitleRelay,
+    debouncedSummaryRelay,
     debouncedImagesRelay,
     debouncedLinksRelay,
     currentDraftId,
@@ -296,6 +302,11 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
+    setHasChanges(true);
+  };
+
+  const handleSummaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSummary(e.target.value);
     setHasChanges(true);
   };
 
@@ -391,15 +402,16 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
     if (!isLongForm) {
       if (attachedImages.length > 0) {
-        finalContent += '\n\n' + attachedImages.join('\n');
+        finalContent += '\n' + attachedImages.join('\n');
       }
       if (attachedLinks.length > 0) {
-        finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n');
+        finalContent += '\n' + attachedLinks.map(l => l.url).join('\n');
       }
     }
 
     updateDraft(draft.id, {
       title,
+      summary: isLongForm && summary.trim() ? summary : undefined,
       content: finalContent,
       targetKind: isLongForm ? 30023 : 1,
       targetPublisher: selectedPublisher ?? undefined,
@@ -452,15 +464,16 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
       if (!isLongForm) {
         if (attachedImages.length > 0) {
-          finalContent += '\n\n' + attachedImages.join('\n');
+          finalContent += '\n' + attachedImages.join('\n');
         }
         if (attachedLinks.length > 0) {
-          finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n');
+          finalContent += '\n' + attachedLinks.map(l => l.url).join('\n');
         }
       }
 
       updateDraft(draft.id, {
         title,
+        summary: isLongForm && summary.trim() ? summary : undefined,
         content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
         targetPublisher: selectedPublisher ?? undefined,
@@ -609,6 +622,23 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 onChange={handleTitleChange}
                 disabled={isSubmittedOrPublished}
               />
+            </div>
+          )}
+
+          {isLongForm && (
+            <div className="space-y-2">
+              <Label htmlFor="summary">Summary (optional)</Label>
+              <Input
+                id="summary"
+                placeholder="Brief description of your article (recommended for discovery)"
+                value={summary}
+                onChange={handleSummaryChange}
+                disabled={isSubmittedOrPublished}
+                maxLength={200}
+              />
+              <p className="text-xs text-muted-foreground">
+                {summary.length}/200 characters - Helps readers discover your article
+              </p>
             </div>
           )}
 
@@ -786,26 +816,38 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           {/* Post Type */}
           <div className="rounded-lg border p-4 space-y-4">
             <h3 className="font-medium">Post Type</h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="kind-toggle">
-                  {isLongForm ? "Long-form Article" : "Short Note"}
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Kind {isLongForm ? "30023" : "1"}
-                </p>
-              </div>
-              <Switch
-                id="kind-toggle"
-                checked={isLongForm}
-                onCheckedChange={handleKindChange}
+            <div className="flex items-center bg-muted rounded-full p-1">
+              <button
+                onClick={() => handleKindChange(false)}
                 disabled={isSubmittedOrPublished}
-              />
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  !isLongForm
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                  isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                Short Note
+              </button>
+              <button
+                onClick={() => handleKindChange(true)}
+                disabled={isSubmittedOrPublished}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  isLongForm
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                  isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                Long-form
+              </button>
             </div>
             <p className="text-xs text-muted-foreground">
               {isLongForm
-                ? "Long-form articles (NIP-23) support markdown and are best for blog posts and articles."
-                : "Short notes (Kind 1) are like tweets - brief updates and thoughts."}
+                ? "Long-form articles (NIP-23, kind 30023) support markdown and are best for blog posts and articles."
+                : "Short notes (kind 1) are like tweets - brief updates and thoughts."}
             </p>
           </div>
 
