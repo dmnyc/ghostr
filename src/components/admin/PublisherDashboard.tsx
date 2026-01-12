@@ -23,15 +23,18 @@ export function PublisherDashboard() {
   const [editingArticle, setEditingArticle] = useState<PublishedItem | null>(null)
   const [idsReady, setIdsReady] = useState(false)
 
-  // Initialize processed IDs from localStorage, then sync from relay
+  // Initialize processed IDs from localStorage, then sync from relay in background
   useEffect(() => {
-    const initialize = async () => {
-      initializeProcessedIds()
-      // Wait for relay sync to complete before allowing inbox subscription
-      await syncProcessedIdsFromRelay()
-      setIdsReady(true)
-    }
-    initialize()
+    // Immediately load from localStorage (fast, synchronous)
+    initializeProcessedIds()
+    // Allow inbox to load right away
+    setIdsReady(true)
+
+    // Sync from relay in background (slow, async)
+    // This will merge relay data with localStorage without blocking the UI
+    syncProcessedIdsFromRelay().catch(() => {
+      // Silently fail - localStorage values are already loaded
+    })
   }, [])
 
   // Load publisher drafts on mount

@@ -405,16 +405,33 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Received:</span>
               <p className="text-sm">
-                {new Date(submission.receivedAt).toLocaleString("en-US", {
-                  month: "numeric",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: true,
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                })}
+                {(() => {
+                  const date = new Date(submission.receivedAt);
+                  // Debug: Log if timestamp seems wrong (year < 2020 means it's in seconds, not ms)
+                  if (date.getFullYear() < 2020) {
+                    console.warn('Timestamp in seconds detected:', submission.receivedAt, '→ multiplying by 1000');
+                    return new Date(submission.receivedAt * 1000).toLocaleString("en-US", {
+                      month: "numeric",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    });
+                  }
+                  return date.toLocaleString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: true,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                  });
+                })()}
               </p>
             </div>
 

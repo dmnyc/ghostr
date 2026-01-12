@@ -9,6 +9,7 @@ import {
   Code,
   Loader2,
   User,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,9 @@ import {
 } from "@/services/profileSearchService";
 import { nip19 } from "nostr-tools";
 import { cn } from "@/lib/utils/cn";
+import { uploadToBlossom } from "@/lib/blossom";
+import { useAuthStore } from "@/stores/authStore";
+import { toast } from "@/hooks/useToast";
 
 interface MarkdownEditorProps {
   value: string;
@@ -58,7 +62,13 @@ export function MarkdownEditor({
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Image upload state
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { results, isLoading, search, clear } = useProfileSearch(300);
+  const { signer } = useAuthStore();
 
   const insertMarkdown = (
     before: string,
@@ -133,6 +143,84 @@ export function MarkdownEditor({
   };
 
   const handleCode = () => insertMarkdown("`", "`", "code");
+
+  // Image upload handler
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input to allow same file again
+    e.target.value = '';
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Image must be less than 10MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!signer) {
+      toast({
+        title: 'Not authenticated',
+        description: 'Please log in to upload images',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setUploadProgress(0);
+
+    try {
+      const result = await uploadToBlossom(
+        file,
+        signer,
+        undefined, // Use default server
+        (progress) => setUploadProgress(progress.percent)
+      );
+
+      // Get selected text for alt attribute
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = value.substring(start, end);
+      const altText = selectedText || 'image';
+
+      // Insert markdown image syntax at cursor
+      insertMarkdown(`![${altText}](`, `${result.url})`, '');
+
+      toast({
+        title: 'Image uploaded',
+        description: 'Image inserted into content',
+      });
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingImage(false);
+      setUploadProgress(0);
+    }
+  }, [value, insertMarkdown, signer]);
 
   // Mention detection
   const detectMention = useCallback(() => {
@@ -365,6 +453,16 @@ export function MarkdownEditor({
 
       {activeTab === "write" ? (
         <>
+          {/* Hidden file input for image upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+            disabled={disabled || isUploadingImage}
+          />
+
           {/* Toolbar */}
           <div className="flex gap-1 p-2 border-b bg-muted/30">
             <Button
@@ -400,6 +498,21 @@ export function MarkdownEditor({
               title="Link (Ctrl+K)"
             >
               <Link className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isUploadingImage}
+              title="Upload Image"
+            >
+              {isUploadingImage ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageIcon className="h-4 w-4" />
+              )}
             </Button>
             <div className="w-px mx-1 bg-border" />
             <Button

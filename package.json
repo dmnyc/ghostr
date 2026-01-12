@@ -1,6 +1,6 @@
 {
   "name": "ghostr",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Nostr delegation and approval workflow application",
   "type": "module",
   "scripts": {
