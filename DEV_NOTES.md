@@ -2,6 +2,52 @@
 
 A Nostr delegation/approval workflow app where delegates draft content and publishers approve and publish it.
 
+---
+
+## Version History
+
+### v0.6.0 (2026-01-11)
+
+**Draft Editor Enhancements**
+
+- **Delete Draft Feature**
+  - Added delete button to draft editor header (for drafts with `status === 'draft'`)
+  - Added delete button to draft cards in list view
+  - Upgraded delete confirmation from `window.confirm()` to shadcn/ui AlertDialog
+  - Consistent confirmation dialog across DraftCard, RejectedList, and DraftEditor
+  - Toast notifications on successful deletion
+  - Deletes from both localStorage and Nostr relays (NIP-37 deletion marker)
+
+- **Auto-save Optimization**
+  - Implemented two-tier debounce system:
+    - Local save (1s): Zustand store + localStorage for instant UI feedback
+    - Relay save (3s): Publishes to Nostr relays, reducing relay writes by 67%
+  - Follows industry standards (Damus uses 3s, Amethyst uses similar patterns)
+  - Prevents relay spam while maintaining responsive UX
+
+- **Relay Sync Indicator**
+  - Added "Saved to relays" indicator with circular arrow icon (RefreshCw)
+  - Appears in editor header after successful relay save
+  - Provides clear feedback that draft has been persisted to Nostr network
+  - Only visible for drafts with `status === 'draft'`
+
+- **Image URL Link Previews**
+  - Image URLs now show as link previews with placeholder icon
+  - Avoids CORS issues, loading failures, and timeouts
+  - Shows filename and "Image file" label
+  - Click to open in new tab
+  - Complements existing image upload button (which shows thumbnails)
+  - Two ways to add images: Upload button (thumbnails) or paste URL (link preview)
+
+**Files Modified:**
+- `src/components/delegate/DraftEditor.tsx` - Delete button, auto-save, relay indicator, image URL handling
+- `src/components/delegate/DraftCard.tsx` - AlertDialog confirmation for delete
+- `src/components/delegate/RejectedList.tsx` - AlertDialog confirmation for delete
+- `src/components/common/LinkPreviewCard.tsx` - Image URL placeholder with click-to-open
+- `src/lib/urlUtils.ts` - URL detection and categorization
+
+---
+
 ## Architecture Overview
 
 ### Tech Stack
@@ -192,3 +238,61 @@ const DEFAULT_RELAYS = [
 ### Components
 - `CoverImageInput` - Upload + URL paste input
 - Integrated in DraftEditor and DirectPostEditor (long-form only)
+
+---
+
+## Future Enhancements
+
+### Image Paste Support
+**Current Behavior:**
+- Pasting images directly into `MentionPillTextarea` is blocked
+- Shows alert: "Image pasting is not supported. Please use the Upload Image button instead."
+- Prevents broken/inaccessible images from being inserted
+
+**Desired Future Behavior:**
+- Intercept paste events containing images
+- Upload pasted images to Blossom automatically
+- Insert the resulting Blossom URL into content
+- Show upload progress indicator
+
+**Implementation Notes:**
+- Add `onPaste` handler to `MentionPillTextarea`
+- Detect `ClipboardEvent.clipboardData.items` with type `image/*`
+- Extract image file from clipboard
+- Upload to Blossom via `uploadToBlossom(file, signer)`
+- Insert resulting URL at cursor position
+- Handle upload errors gracefully
+
+**Affected Components:**
+- `src/components/common/MentionPillTextarea.tsx`
+- `src/lib/blossom.ts` (upload utilities)
+
+### Image URL Visibility in Editors
+**Current Behavior:**
+- When using the "Upload Image" button, the image URL is appended to the content text
+- Both uploaded URLs and pasted URLs appear in the content editor
+- Image thumbnails are shown separately below the content
+
+**Desired Behavior:**
+- Uploaded image URLs (via Upload Image button) should NOT appear in the content text
+- Only manually typed/pasted URLs should be visible in the content editor
+- Uploaded images should only appear as thumbnails
+- When publishing, all image URLs (uploaded + pasted) should be included in the final content
+
+**Implementation Notes:**
+- Track uploaded images separately from pasted URLs using `uploadedImages` array
+- Filter out `uploadedImages` from the visible content in the editor
+- When publishing or submitting, merge `uploadedImages` back into the content
+- DraftEditor already has partial implementation (lines 128-133) that removes uploaded images from display
+- Need to extend this pattern to:
+  - ReviewPane (publisher review)
+  - DirectPostEditor (publisher direct posts)
+  - PublishDialog (final content assembly)
+
+**Affected Components:**
+- `src/components/delegate/DraftEditor.tsx`
+- `src/components/admin/ReviewPane.tsx`
+- `src/components/admin/DirectPostEditor.tsx`
+- `src/components/admin/PublishDialog.tsx`
+- `src/types/draft.ts` (Draft.uploadedImages)
+- `src/types/submission.ts` (may need uploadedImages field)

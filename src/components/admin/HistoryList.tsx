@@ -26,9 +26,39 @@ import {
   getDisplayName,
   type SearchProfile,
 } from "@/services/profileSearchService";
+import { nip19 } from "nostr-tools";
+import { useAuthStore } from "@/stores/authStore";
 
 interface HistoryListProps {
   onEditArticle?: (item: PublishedItem) => void;
+}
+
+/**
+ * Generate the correct Nostr identifier for an item
+ * - For kind 30023 articles: naddr (includes pubkey, kind, and d-tag)
+ * - For kind 1 notes: use hex event ID (nevent requires relay hints)
+ */
+function getNostrIdentifier(item: PublishedItem): string {
+  const { user } = useAuthStore.getState();
+
+  // For kind 30023 articles, use naddr
+  if (item.kind === 30023 && item.dTag && user) {
+    try {
+      return nip19.naddrEncode({
+        kind: 30023,
+        pubkey: user.pubkey,
+        identifier: item.dTag,
+      });
+    } catch (error) {
+      console.error("[HistoryList] Failed to encode naddr:", error);
+      // Fallback to hex
+      return item.id;
+    }
+  }
+
+  // For kind 1 notes, use hex event ID
+  // (nevent would require relay hints which we don't have in PublishedItem)
+  return item.id;
 }
 
 export function HistoryList({ onEditArticle }: HistoryListProps) {
@@ -200,7 +230,7 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
           </Button>
         )}
         <a
-          href={`https://jumble.social/notes/${item.id}`}
+          href={`https://jumble.social/notes/${getNostrIdentifier(item)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-accent"

@@ -124,11 +124,21 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
     setIsSubmitting(true)
 
     try {
-      // Build tags array, including cover image if present
+      // Build tags array, including title, summary, and cover image if present
       const tags = [...draft.tags]
-      if (draft.targetKind === 30023 && draft.coverImage) {
+      if (draft.targetKind === 30023) {
+        // Add title tag (NIP-23 requires it)
+        if (draft.title?.trim()) {
+          tags.push(['title', draft.title])
+        }
+        // Add summary tag if set (NIP-23)
+        if (draft.summary?.trim()) {
+          tags.push(['summary', draft.summary])
+        }
         // Add image tag for long-form articles with cover image
-        tags.push(['image', draft.coverImage])
+        if (draft.coverImage) {
+          tags.push(['image', draft.coverImage])
+        }
       }
 
       // Generate unique submission ID for each submission

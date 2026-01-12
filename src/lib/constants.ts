@@ -13,6 +13,7 @@ export const FAVORITES_D_TAG = 'ghostr-favorites'
 export const PUBLISH_HISTORY_D_TAG = 'ghostr-publish-history'
 export const PROCESSED_SUBMISSIONS_D_TAG = 'ghostr-processed-submissions'
 export const ARCHIVED_SUBMISSIONS_D_TAG = 'ghostr-archived-submissions'
+export const EDITED_SUBMISSIONS_D_TAG = 'ghostr-edited-submissions'
 export const DRAFT_KIND = 30078 // Legacy NIP-78 (for migration)
 export const NIP37_DRAFT_KIND = 31234 // NIP-37 draft wraps
 export const PROTOCOL_VERSION = 'ghostr_v1'

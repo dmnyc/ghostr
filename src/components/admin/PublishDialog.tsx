@@ -28,6 +28,9 @@ interface PublishDialogProps {
   onOpenChange: (open: boolean) => void
   submission: Submission
   editedContent: string
+  editedTitle?: string
+  editedSummary?: string
+  editedCoverImage?: string
   onSuccess: () => void
 }
 
@@ -36,6 +39,9 @@ export function PublishDialog({
   onOpenChange,
   submission,
   editedContent,
+  editedTitle,
+  editedSummary,
+  editedCoverImage,
   onSuccess,
 }: PublishDialogProps) {
   const { ndk } = useNDKStore()
@@ -77,7 +83,35 @@ export function PublishDialog({
         // Long-form article requires a 'd' tag
         dTag = `ghostr-${submission.id}`
         tags.push(['d', dTag])
-        tags.push(...submission.tags.filter((t) => t[0] !== 'd'))
+
+        // Use edited title and summary if provided, otherwise fall back to original tags
+        if (editedTitle?.trim()) {
+          tags.push(['title', editedTitle])
+        } else {
+          const titleTag = submission.tags.find((t) => t[0] === 'title')
+          if (titleTag) tags.push(titleTag)
+        }
+
+        if (editedSummary?.trim()) {
+          tags.push(['summary', editedSummary])
+        } else {
+          const summaryTag = submission.tags.find((t) => t[0] === 'summary')
+          if (summaryTag) tags.push(summaryTag)
+        }
+
+        // Add published_at timestamp
+        tags.push(['published_at', Math.floor(Date.now() / 1000).toString()])
+
+        // Add cover image if provided (edited or original)
+        if (editedCoverImage?.trim()) {
+          tags.push(['image', editedCoverImage])
+        } else {
+          const imageTag = submission.tags.find((t) => t[0] === 'image')
+          if (imageTag) tags.push(imageTag)
+        }
+
+        // Add other tags except d, title, summary, image (already handled above)
+        tags.push(...submission.tags.filter((t) => t[0] && !['d', 'title', 'summary', 'image'].includes(t[0])))
       } else {
         tags.push(...submission.tags)
       }
@@ -95,9 +129,9 @@ export function PublishDialog({
 
       const publishedEventId = event.id
 
-      // Extract title and cover image from tags for history
-      const titleTag = submission.tags.find((t) => t[0] === 'title')
-      const imageTag = submission.tags.find((t) => t[0] === 'image')
+      // Use edited values if provided, otherwise extract from original tags
+      const finalTitle = editedTitle?.trim() || submission.tags.find((t) => t[0] === 'title')?.[1]
+      const finalCoverImage = editedCoverImage?.trim() || submission.tags.find((t) => t[0] === 'image')?.[1]
 
       // Send receipt to delegate
       try {
@@ -134,9 +168,9 @@ export function PublishDialog({
         id: publishedEventId,
         content: editedContent,
         kind: submission.kind,
-        title: titleTag?.[1],
+        title: finalTitle,
         dTag,
-        coverImage: imageTag?.[1],
+        coverImage: finalCoverImage,
         publishedAt: Date.now(),
         source: 'delegate',
         delegatePubkey: submission.delegatePubkey,

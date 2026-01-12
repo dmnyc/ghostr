@@ -334,7 +334,7 @@ export function MarkdownEditor({
   };
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", className)}>
+    <div className={cn("rounded-lg border overflow-hidden max-w-full", className)}>
       {/* Tabs */}
       <div className="flex border-b bg-muted/30">
         <button
@@ -460,7 +460,11 @@ export function MarkdownEditor({
               onSelect={detectMention}
               placeholder={placeholder}
               disabled={disabled}
-              className="min-h-[400px] rounded-none border-0 resize-y font-mono focus-visible:ring-0"
+              className="min-h-[400px] rounded-none border-0 resize-y font-mono focus-visible:ring-0 max-w-full overflow-x-auto"
+              style={{
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere'
+              }}
             />
 
             {/* Mention popover */}

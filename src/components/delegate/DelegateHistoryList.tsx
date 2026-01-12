@@ -8,7 +8,7 @@ import type { Draft } from "@/types/draft";
 export function DelegateHistoryList() {
   const { drafts, setCurrentDraft, deleteDraft } = useDraftStore();
 
-  const publishedDrafts = drafts.filter((d) => d.status === "published");
+  const publishedDrafts = drafts.filter((d) => d.status === "published" && !d.archived);
 
   const handleView = (draft: Draft) => {
     setCurrentDraft(draft.id);

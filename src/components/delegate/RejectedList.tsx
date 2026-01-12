@@ -4,20 +4,38 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { useDraftStore } from '@/stores/draftStore'
 import type { Draft } from '@/types/draft'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from '@/hooks/useToast'
+import { useState } from 'react'
 
 export function RejectedList() {
   const { drafts, setCurrentDraft, deleteDraft } = useDraftStore()
+  const [deletingDraft, setDeletingDraft] = useState<Draft | null>(null)
 
-  const rejectedDrafts = drafts.filter((d) => d.status === 'rejected')
+  const rejectedDrafts = drafts.filter((d) => d.status === 'rejected' && !d.archived)
 
   const handleOpen = (draft: Draft) => {
     setCurrentDraft(draft.id)
   }
 
-  const handleDelete = async (draft: Draft) => {
-    if (window.confirm('Are you sure you want to delete this rejected draft?')) {
-      await deleteDraft(draft.id)
-    }
+  const handleDelete = async () => {
+    if (!deletingDraft) return
+    const draftId = deletingDraft.id
+    setDeletingDraft(null)
+    await deleteDraft(draftId)
+    toast({
+      title: 'Draft deleted',
+      description: 'Your draft has been permanently deleted.',
+    })
   }
 
   const formatDate = (timestamp: number) => {
@@ -76,7 +94,7 @@ export function RejectedList() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => handleDelete(draft)}
+                onClick={() => setDeletingDraft(draft)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -90,6 +108,23 @@ export function RejectedList() {
           )}
         </div>
       ))}
+
+      <AlertDialog open={!!deletingDraft} onOpenChange={(open) => !open && setDeletingDraft(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this draft from both your local storage and relays. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

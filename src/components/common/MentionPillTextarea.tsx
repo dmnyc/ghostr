@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, forwardRef, useCallback } from 'react'
+import { useState, useRef, useEffect, forwardRef, useCallback, useMemo } from 'react'
 import ReactDOMServer from 'react-dom/server'
 import { Loader2, User } from 'lucide-react'
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
-import { useProfileSearch } from '@/hooks/queries/useProfileQuery'
+import { useProfileSearch, useProfileQueries } from '@/hooks/queries/useProfileQuery'
 import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profileSearchService'
 import { nip19 } from 'nostr-tools'
 import { cn } from '@/lib/utils/cn'
@@ -44,6 +44,9 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     const contentEditableRef = (ref as React.RefObject<HTMLDivElement>) || internalRef
     const listRef = useRef<HTMLDivElement>(null)
     const isInternalUpdate = useRef(false)
+    const hasUserInteracted = useRef(false)
+    const lastValueRef = useRef('')
+    const isInitialized = useRef(false)
 
     // Debounce search query for React Query
     const debouncedQuery = useDebounce(searchQuery, 300)
@@ -51,40 +54,99 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     // Use React Query for profile search with automatic caching
     const { data: results = [], isLoading } = useProfileSearch(debouncedQuery)
 
-    // Extract mentioned profiles from value
-    useEffect(() => {
+    // Extract npub mentions from value and convert to pubkeys
+    const mentionedPubkeys = useMemo(() => {
       const regex = /nostr:(npub1[a-z0-9]{58,})/g
       const npubs: string[] = []
       let match: RegExpExecArray | null
 
       while ((match = regex.exec(value)) !== null) {
-        npubs.push(match[0])
+        if (match[1]) {
+          npubs.push(match[1]) // Extract just the npub part
+        }
       }
 
-      // Fetch profiles for all npubs (React Query will cache them)
-      npubs.forEach(async (npub) => {
-        try {
-          const decoded = nip19.decode(npub.replace('nostr:', ''))
-          if (decoded.type === 'npub') {
-            // This will be cached by React Query
-            // In a real implementation, you'd use useProfileQuery here
-            // For now, we'll rely on the profiles being cached from search
+      // Convert npubs to pubkeys
+      return npubs
+        .map((npub) => {
+          try {
+            const decoded = nip19.decode(npub)
+            return decoded.type === 'npub' ? decoded.data : null
+          } catch {
+            return null
           }
-        } catch (e) {
-          // Invalid npub, ignore
-        }
-      })
+        })
+        .filter((p): p is string => p !== null)
     }, [value])
 
-    // Update contentEditable when value or profiles change
+    // Fetch all mentioned profiles using React Query
+    const { profiles: fetchedProfiles } = useProfileQueries(mentionedPubkeys)
+
+    // Update mentionedProfiles map when profiles are fetched
+    useEffect(() => {
+      const newProfiles = new Map<string, SearchProfile>()
+
+      fetchedProfiles.forEach((profile) => {
+        const npub = nip19.npubEncode(profile.pubkey)
+        const mention = `nostr:${npub}`
+        newProfiles.set(mention, profile)
+      })
+
+      // Only update if the Map actually changed
+      setMentionedProfiles(prev => {
+        if (prev.size !== newProfiles.size) return newProfiles
+
+        for (const [key, value] of newProfiles) {
+          if (!prev.has(key) || prev.get(key)?.pubkey !== value.pubkey) {
+            return newProfiles
+          }
+        }
+
+        return prev // No change, return same reference
+      })
+    }, [fetchedProfiles])
+
+    // Update contentEditable when value changes from parent (external change)
     useEffect(() => {
       if (isInternalUpdate.current) {
         isInternalUpdate.current = false
+        lastValueRef.current = value
         return
       }
+
+      // On first render, initialize the content
+      // If there are mentions in the value, wait for profiles to be fetched
+      if (!isInitialized.current) {
+        const hasMentions = /nostr:(npub1[a-z0-9]{58,})/.test(value)
+        const profilesLoaded = !hasMentions || mentionedProfiles.size > 0
+
+        if (profilesLoaded) {
+          isInitialized.current = true
+          lastValueRef.current = value
+
+          if (contentEditableRef.current) {
+            const nodes = renderTextWithMentions(value, mentionedProfiles)
+            const newHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
+            contentEditableRef.current.innerHTML = newHTML
+          }
+        }
+        return
+      }
+
+      // Only run if value actually changed
+      if (lastValueRef.current === value) {
+        return
+      }
+
+      lastValueRef.current = value
+
       if (contentEditableRef.current) {
         const nodes = renderTextWithMentions(value, mentionedProfiles)
-        contentEditableRef.current.innerHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
+        const newHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
+
+        if (contentEditableRef.current.innerHTML !== newHTML) {
+          contentEditableRef.current.innerHTML = newHTML
+        }
       }
     }, [value, mentionedProfiles, contentEditableRef])
 
@@ -123,6 +185,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
 
     const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
       isInternalUpdate.current = true
+      hasUserInteracted.current = true
 
       const newText = htmlToPlainText(e.currentTarget)
       onChange(newText)
@@ -260,6 +323,25 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       [contentEditableRef]
     )
 
+    // Handle paste events to prevent image pastes
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      // Check if any item is an image
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item && item.type.startsWith('image/')) {
+          e.preventDefault()
+          // Show a toast message directing user to the upload button
+          if (window.confirm('Image pasting is not supported. Please use the Upload Image button instead.')) {
+            // User acknowledged
+          }
+          return
+        }
+      }
+    }
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       const selection = window.getSelection()
       if (!selection || !selection.rangeCount) return
@@ -366,20 +448,27 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     }
 
     return (
-      <div className="relative">
+      <div className="relative max-w-full overflow-hidden">
         <div
           ref={contentEditableRef}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onBeforeInput={handleBeforeInput}
+          onPaste={handlePaste}
+          onClick={() => { hasUserInteracted.current = true }}
+          onFocus={() => { hasUserInteracted.current = true }}
           contentEditable={!disabled}
           className={cn(
             'relative p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-            'whitespace-pre-wrap break-words',
+            'whitespace-pre-wrap break-words max-w-full overflow-x-auto',
             disabled && 'opacity-50 cursor-not-allowed',
             className
           )}
-          style={{ minHeight }}
+          style={{
+            minHeight,
+            wordBreak: 'break-all',
+            overflowWrap: 'anywhere'
+          }}
           data-placeholder={placeholder}
         />
 

@@ -7,34 +7,54 @@ import { HistoryList } from './HistoryList'
 import { ArchivedSubmissionsList } from './ArchivedSubmissionsList'
 import { DirectPostEditor } from './DirectPostEditor'
 import { EditArticleEditor } from './EditArticleEditor'
+import { PublisherDraftList } from './PublisherDraftList'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSubmissionStore, initializeProcessedIds, syncProcessedIdsFromRelay } from '@/stores/submissionStore'
 import { useAdminInbox } from '@/hooks/useAdminInbox'
 import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
+import { usePublisherDraftStore } from '@/stores/publisherDraftStore'
 
 export function PublisherDashboard() {
   const { currentSubmissionId, setCurrentSubmission, isLoading, submissions, archivedSubmissions } = useSubmissionStore()
   const { getUnreadCount, markAsViewed } = usePublishHistoryStore()
+  const { loadDrafts, drafts, currentDraftId, setCurrentDraft } = usePublisherDraftStore()
   const [activeTab, setActiveTab] = useState('inbox')
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [editingArticle, setEditingArticle] = useState<PublishedItem | null>(null)
+  const [idsReady, setIdsReady] = useState(false)
 
   // Initialize processed IDs from localStorage, then sync from relay
   useEffect(() => {
-    initializeProcessedIds()
-    // Async load from relay and merge (runs in background)
-    syncProcessedIdsFromRelay()
+    const initialize = async () => {
+      initializeProcessedIds()
+      // Wait for relay sync to complete before allowing inbox subscription
+      await syncProcessedIdsFromRelay()
+      setIdsReady(true)
+    }
+    initialize()
   }, [])
 
-  // Subscribe to inbox
-  useAdminInbox()
+  // Load publisher drafts on mount
+  useEffect(() => {
+    loadDrafts()
+  }, [loadDrafts])
+
+  // Subscribe to inbox only after IDs are ready
+  useAdminInbox(idsReady)
 
   const handleBack = () => {
     setCurrentSubmission(null)
   }
 
-  if (isCreatingPost) {
-    return <DirectPostEditor onBack={() => setIsCreatingPost(false)} />
+  const handleDraftEditorBack = () => {
+    setCurrentDraft(null)
+  }
+
+  if (isCreatingPost || currentDraftId) {
+    return <DirectPostEditor onBack={() => {
+      setIsCreatingPost(false)
+      handleDraftEditorBack()
+    }} />
   }
 
   if (editingArticle) {
@@ -46,7 +66,8 @@ export function PublisherDashboard() {
   }
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length
-  const archivedCount = archivedSubmissions.length
+  const archivedSubmissionsCount = archivedSubmissions.length
+  const draftCount = drafts.filter((d) => d.status === 'draft' && !d.archived).length
   const unreadHistoryCount = getUnreadCount()
 
   const handleTabChange = (value: string) => {
@@ -76,6 +97,9 @@ export function PublisherDashboard() {
           <TabsTrigger value="inbox">
             Inbox {pendingCount > 0 && `(${pendingCount})`}
           </TabsTrigger>
+          <TabsTrigger value="drafts">
+            Drafts {draftCount > 0 && `(${draftCount})`}
+          </TabsTrigger>
           <TabsTrigger value="history" className="relative">
             History
             {unreadHistoryCount > 0 && (
@@ -84,8 +108,8 @@ export function PublisherDashboard() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="archived">
-            Archived {archivedCount > 0 && `(${archivedCount})`}
+          <TabsTrigger value="archived-submissions">
+            Archived {archivedSubmissionsCount > 0 && `(${archivedSubmissionsCount})`}
           </TabsTrigger>
         </TabsList>
 
@@ -93,11 +117,15 @@ export function PublisherDashboard() {
           <InboxQueue isLoading={isLoading} />
         </TabsContent>
 
+        <TabsContent value="drafts" className="mt-4">
+          <PublisherDraftList />
+        </TabsContent>
+
         <TabsContent value="history" className="mt-4">
           <HistoryList onEditArticle={setEditingArticle} />
         </TabsContent>
 
-        <TabsContent value="archived" className="mt-4">
+        <TabsContent value="archived-submissions" className="mt-4">
           <ArchivedSubmissionsList />
         </TabsContent>
       </Tabs>

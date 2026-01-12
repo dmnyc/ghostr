@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
   type PublishedItem,
 } from "@/stores/publishHistoryStore";
 import { toast } from "@/hooks/useToast";
-import { NDKEvent } from "@nostr-dev-kit/ndk";
+import { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 
 interface EditArticleEditorProps {
   item: PublishedItem;
@@ -32,12 +32,106 @@ export function EditArticleEditor({
   const { updateItem } = usePublishHistoryStore();
 
   const [title, setTitle] = useState(item.title ?? "");
+  const [summary, setSummary] = useState(item.summary ?? "");
   const [content, setContent] = useState(item.content);
   const [coverImage, setCoverImage] = useState<string | undefined>(
     item.coverImage,
   );
   const [isPublishing, setIsPublishing] = useState(false);
   const [includeCredit, setIncludeCredit] = useState(creditGhostr);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+
+  // Track original values to detect changes
+  const [originalTitle, setOriginalTitle] = useState(item.title ?? "");
+  const [originalSummary, setOriginalSummary] = useState(item.summary ?? "");
+  const [originalContent, setOriginalContent] = useState(item.content);
+  const [originalCoverImage, setOriginalCoverImage] = useState<string | undefined>(
+    item.coverImage,
+  );
+
+  // Fetch full event content if it's missing (e.g., loaded from history without full content)
+  useEffect(() => {
+    const fetchEventContent = async () => {
+      // Publish history only stores first 100 chars, so always fetch full content for kind 30023
+      // For kind 1 notes, fetch if content seems truncated or empty
+      const shouldFetch =
+        !content ||
+        content.trim().length === 0 ||
+        (item.kind === 30023 && content.length <= 100) ||
+        (item.kind === 1 && content.trim().length < 50);
+
+      if (ndk && shouldFetch) {
+        setIsLoadingContent(true);
+        try {
+          const { user } = useAuthStore.getState();
+          if (!user) return;
+
+          // For kind 30023 articles, use dTag to fetch the replaceable event
+          const filter: NDKFilter = item.dTag
+            ? {
+                kinds: [30023],
+                authors: [user.pubkey],
+                "#d": [item.dTag],
+                limit: 1,
+              }
+            : {
+                kinds: [item.kind],
+                ids: [item.id],
+                limit: 1,
+              };
+
+          const events = await ndk.fetchEvents(filter);
+          const event = Array.from(events)[0];
+
+          if (event && event.content) {
+            setContent(event.content);
+            setOriginalContent(event.content);
+
+            // Also update title, summary, and cover image if available
+            const titleTag = event.tags.find((tag) => tag[0] === "title");
+            if (titleTag && titleTag[1]) {
+              setTitle(titleTag[1]);
+              setOriginalTitle(titleTag[1]);
+            }
+
+            const summaryTag = event.tags.find((tag) => tag[0] === "summary");
+            if (summaryTag && summaryTag[1]) {
+              setSummary(summaryTag[1]);
+              setOriginalSummary(summaryTag[1]);
+            }
+
+            const imageTag = event.tags.find((tag) => tag[0] === "image");
+            if (imageTag && imageTag[1]) {
+              setCoverImage(imageTag[1]);
+              setOriginalCoverImage(imageTag[1]);
+            }
+          }
+        } catch (error) {
+          console.error("[EditArticleEditor] Failed to fetch event:", error);
+          toast({
+            title: "Failed to load content",
+            description:
+              "Could not fetch the full article content. You may need to re-enter it.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingContent(false);
+        }
+      }
+    };
+
+    fetchEventContent();
+  }, [ndk, item.id, item.kind, item.dTag]);
+
+  // Check if any changes have been made
+  const hasChanges = useMemo(() => {
+    return (
+      title !== originalTitle ||
+      summary !== originalSummary ||
+      content !== originalContent ||
+      coverImage !== originalCoverImage
+    );
+  }, [title, originalTitle, summary, originalSummary, content, originalContent, coverImage, originalCoverImage]);
 
   const handlePublish = async () => {
     if (!content.trim()) {
@@ -81,6 +175,11 @@ export function EditArticleEditor({
         ["published_at", Math.floor(Date.now() / 1000).toString()],
       ];
 
+      // Add summary tag if set (NIP-23)
+      if (summary.trim()) {
+        tags.push(["summary", summary]);
+      }
+
       // Add cover image tag if set
       if (coverImage) {
         tags.push(["image", coverImage]);
@@ -102,6 +201,7 @@ export function EditArticleEditor({
         content,
         kind: 30023,
         title,
+        summary: summary.trim() || undefined,
         dTag: item.dTag,
         coverImage,
         publishedAt: Date.now(),
@@ -139,7 +239,7 @@ export function EditArticleEditor({
           <div>
             <h1 className="text-xl font-bold">Edit Article</h1>
             <p className="text-sm text-muted-foreground">
-              Update and republish this article
+              {isLoadingContent ? "Loading article content..." : "Update and republish this article"}
             </p>
           </div>
         </div>
@@ -154,7 +254,7 @@ export function EditArticleEditor({
             />
             Credit Ghostr
           </label>
-          <Button onClick={handlePublish} disabled={isPublishing}>
+          <Button onClick={handlePublish} disabled={isPublishing || !hasChanges}>
             {isPublishing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -175,6 +275,20 @@ export function EditArticleEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="summary">Summary (optional)</Label>
+            <Input
+              id="summary"
+              placeholder="Brief description of your article (recommended for discovery)"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              maxLength={200}
+            />
+            <p className="text-xs text-muted-foreground">
+              {summary.length}/200 characters - Helps readers discover your article
+            </p>
           </div>
 
           <CoverImageInput value={coverImage} onChange={setCoverImage} />

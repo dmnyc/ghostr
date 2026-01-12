@@ -6,6 +6,7 @@ import {
   PUBLISH_HISTORY_D_TAG,
   PROCESSED_SUBMISSIONS_D_TAG,
   ARCHIVED_SUBMISSIONS_D_TAG,
+  EDITED_SUBMISSIONS_D_TAG,
   MAX_PUBLISH_HISTORY_ITEMS,
 } from '@/lib/constants'
 import { useNDKStore } from '@/stores/ndkStore'
@@ -69,7 +70,7 @@ interface StoredHistoryItem {
   id: string
   kind: 1 | 30023
   title?: string
-  summary?: string // First 100 chars of content
+  summary?: string // User-provided summary or first 100 chars of content
   dTag?: string
   coverImage?: string
   publishedAt: number
@@ -83,7 +84,8 @@ function toStoredItem(item: PublishedItem): StoredHistoryItem {
     id: item.id,
     kind: item.kind,
     title: item.title,
-    summary: item.content.slice(0, 100),
+    // Use provided summary, or fallback to first 100 chars of content
+    summary: item.summary || item.content.slice(0, 100),
     dTag: item.dTag,
     coverImage: item.coverImage,
     publishedAt: item.publishedAt,
@@ -98,6 +100,7 @@ function fromStoredItem(stored: StoredHistoryItem): PublishedItem {
     id: stored.id,
     kind: stored.kind,
     title: stored.title,
+    summary: stored.summary,
     content: stored.summary || '', // Will be empty/truncated, can fetch full from relay if needed
     dTag: stored.dTag,
     coverImage: stored.coverImage,
@@ -254,6 +257,67 @@ export async function saveArchivedSubmissionsToRelay(ids: string[]): Promise<voi
   event.kind = DRAFT_KIND
   event.content = encrypted
   event.tags = [['d', ARCHIVED_SUBMISSIONS_D_TAG]]
+
+  await event.publish()
+}
+
+// Edited submissions (publisher edits to pending submissions)
+export interface EditedSubmissionData {
+  id: string // submission ID
+  content: string
+  title?: string // For kind 30023
+  summary?: string // For kind 30023
+  coverImage?: string // For kind 30023
+  updatedAt: number
+}
+
+export async function loadEditedSubmissionsFromRelay(): Promise<Record<string, EditedSubmissionData>> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  const filter = {
+    kinds: [DRAFT_KIND],
+    authors: [user.pubkey],
+    '#d': [EDITED_SUBMISSIONS_D_TAG],
+  }
+
+  const event = await ndk.fetchEvent(filter)
+
+  if (!event) {
+    return {}
+  }
+
+  try {
+    const decrypted = await signer.decrypt(user, event.content)
+    const edits = JSON.parse(decrypted) as EditedSubmissionData[]
+    // Convert array to map keyed by submission ID
+    return Object.fromEntries(edits.map((edit) => [edit.id, edit]))
+  } catch {
+    return {}
+  }
+}
+
+export async function saveEditedSubmissionsToRelay(edits: Record<string, EditedSubmissionData>): Promise<void> {
+  const { ndk } = useNDKStore.getState()
+  const { user, signer } = useAuthStore.getState()
+
+  if (!ndk || !user || !signer) {
+    throw new Error('Not connected or authenticated')
+  }
+
+  // Convert map to array for storage
+  const editsArray = Object.values(edits)
+  const content = JSON.stringify(editsArray)
+  const encrypted = await signer.encrypt(user, content)
+
+  const event = new NDKEvent(ndk)
+  event.kind = DRAFT_KIND
+  event.content = encrypted
+  event.tags = [['d', EDITED_SUBMISSIONS_D_TAG]]
 
   await event.publish()
 }
