@@ -6,6 +6,9 @@ export const DEFAULT_RELAYS = [
   'wss://nostr.mom',
   'wss://relay.nostr.net',
   'wss://purplepag.es',
+  'wss://nostr.wine',
+  'wss://relay.nostr.bg',
+  'wss://relay.nos.social',
 ]
 
 export const DRAFT_D_TAG = 'ghostr-drafts'

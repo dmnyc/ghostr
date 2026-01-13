@@ -7,7 +7,7 @@ export function getNDK(): NDK {
   if (!ndkInstance) {
     ndkInstance = new NDK({
       explicitRelayUrls: getStoredRelays(),
-      autoConnectUserRelays: false,
+      autoConnectUserRelays: true, // Enable NIP-65: use user's relay list preferences
     })
   }
   return ndkInstance
