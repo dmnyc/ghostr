@@ -4,10 +4,8 @@ export const DEFAULT_RELAYS = [
   'wss://relay.primal.net',
   'wss://relay.snort.social',
   'wss://nostr.mom',
-  'wss://relay.nostr.net',
   'wss://purplepag.es',
   'wss://nostr.wine',
-  'wss://relay.nostr.bg',
   'wss://relay.nos.social',
 ]
 
