@@ -122,6 +122,20 @@ Ghostr supports NIP-07 browser extensions (Alby, nos2x, etc.) for signing. Your 
 
 **Note:** This application uses **NIP-44** for encryption to ensure modern security standards. It may not work properly with older browser extensions that only support NIP-04 encryption.
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Built for the Nostr protocol
+- From the creator of [Plebs vs. Zombies](https://plebsvszombies.cc) and [Mutable](https://mutable.top)
+
+## Author
+
+- Created by The Daniel⚡️
+- Vibed with Claude Code

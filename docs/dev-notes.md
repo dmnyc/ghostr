@@ -1,5 +1,41 @@
 # Development Notes
 
+## State Management Guidelines
+
+### Async vs Sync State
+
+**Rule of thumb:**
+- **Async state (React Query)**: Data that needs to be retrieved and awaited
+- **Sync state (Zustand)**: Data that can be immediately changed without await
+
+**When to use React Query:**
+- Data fetched from relays
+- Data fetched from databases or external APIs
+- Any data that requires an async operation to retrieve
+- Data that benefits from caching, background refetching, and stale-while-revalidate patterns
+
+**When to use Zustand:**
+- UI state (modals, sidebars, tabs)
+- User preferences and settings
+- Authentication state (current user/signer)
+- Local-only state that doesn't need server synchronization
+
+**Why this matters:**
+- React Query handles loading states, error states, caching, and refetching automatically
+- Zustand stores are synchronous and don't have built-in async handling patterns
+- Mixing async data into Zustand requires manual loading/error state management
+- React Query's `staleTime` and `gcTime` prevent unnecessary refetches
+
+**Current usage in Ghostr:**
+- `useAdminInbox`, `useDrafts`, `usePublishHistory` - React Query for relay data
+- `useSettingsStore`, `useUIStore`, `useAuthStore` - Zustand for sync state
+- `ndkStore` - Zustand for connection state (sync) but consider React Query for relay fetches
+
+**Migration consideration:**
+Some stores like `favoritesStore` currently use Zustand for relay data. These could benefit from React Query for better caching and background sync.
+
+---
+
 ## 2026-01-12: Fixed Markdown Line Break Rendering
 
 ### Issue
