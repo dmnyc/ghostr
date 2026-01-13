@@ -70,10 +70,13 @@ export function PublishDialog({
     setError(null)
 
     try {
+      // Normalize line breaks for markdown: convert single \n to \n\n for proper paragraph breaks
+      const normalizedContent = editedContent.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+
       // Create the event with admin's key
       const event = new NDKEvent(ndk)
       event.kind = submission.kind
-      event.content = editedContent
+      event.content = normalizedContent
 
       // Build tags based on kind
       const tags: string[][] = []
@@ -166,7 +169,7 @@ export function PublishDialog({
       // Add to publish history
       addItem({
         id: publishedEventId,
-        content: editedContent,
+        content: normalizedContent,
         kind: submission.kind,
         title: finalTitle,
         dTag,

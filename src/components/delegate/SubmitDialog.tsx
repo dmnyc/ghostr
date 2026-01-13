@@ -145,11 +145,16 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
       // This allows resubmissions after rejection (publisher tracks by submission ID)
       const submissionId = uuid()
 
+      // Normalize line breaks for long-form markdown: convert single \n to \n\n for proper paragraph breaks
+      const normalizedContent = draft.targetKind === 30023
+        ? draft.content.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+        : draft.content
+
       const payload: SubmissionPayload = {
         protocol: PROTOCOL_VERSION,
         type: 'submission',
         id: submissionId,
-        content: draft.content,
+        content: normalizedContent,
         kind: draft.targetKind,
         tags,
         note: note.trim(),

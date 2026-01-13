@@ -164,9 +164,12 @@ export function EditArticleEditor({
     setIsPublishing(true);
 
     try {
+      // Normalize line breaks for markdown: convert single \n to \n\n for proper paragraph breaks
+      const normalizedContent = content.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
+
       const event = new NDKEvent(ndk);
       event.kind = 30023;
-      event.content = content;
+      event.content = normalizedContent;
 
       // Use the same d-tag to replace the article
       const tags: string[][] = [

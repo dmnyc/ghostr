@@ -320,6 +320,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         if (attachedLinks.length > 0) {
           finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n')
         }
+      } else {
+        // For long-form markdown, normalize line breaks: convert single \n to \n\n for proper paragraph breaks
+        finalContent = finalContent.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
       }
 
       event.content = finalContent

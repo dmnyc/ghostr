@@ -1,5 +1,56 @@
 # Development Notes
 
+## 2026-01-12: Fixed Markdown Line Break Rendering
+
+### Issue
+Single line breaks in markdown editors were not rendering as line breaks in published posts. When users pressed Enter once between lines, the content would appear on a single line in some Nostr clients.
+
+Example:
+```
+**There are things out there you don't need to know about**
+Agent K, Men In Black
+```
+
+Would render as:
+```
+**There are things out there you don't need to know about** Agent K, Men In Black
+```
+
+### Root Cause
+Markdown specification treats single newlines (`\n`) as soft breaks that collapse into spaces. To create visible line breaks, you need either:
+- Two newlines (`\n\n`) - paragraph break
+- Two trailing spaces + newline (`  \n`) - hard line break
+
+Our editors stored single `\n` characters when users pressed Enter, which is correct for storage but needs normalization before publishing to ensure proper rendering across all Nostr clients.
+
+### Solution
+Added automatic line break normalization before publishing: convert single `\n` to `\n\n` for proper paragraph breaks in markdown.
+
+**Regex pattern:** `/([^\n])\n([^\n])/g` → `'$1\n\n$2'`
+
+This matches any newline that has non-newline characters on both sides and doubles it.
+
+**Files Changed:**
+1. `src/components/admin/PublishDialog.tsx` - Normalize when publishing delegate submissions
+2. `src/components/admin/DirectPostEditor.tsx` - Normalize for publisher direct posts (long-form only)
+3. `src/components/admin/EditArticleEditor.tsx` - Normalize when editing published articles
+4. `src/components/delegate/SubmitDialog.tsx` - Normalize when delegate submits (kind 30023 only)
+
+### Behavior
+- **Kind 1 (short notes)**: No normalization - single line breaks are preserved as-is
+- **Kind 30023 (long-form articles)**: All single line breaks converted to double line breaks for proper markdown rendering
+
+### Testing
+Test with content:
+```
+**Bold text**
+Plain text on next line
+```
+
+Should now render with a visible line break between the two lines.
+
+---
+
 ## 2026-01-12: Fixed Timestamp Mismatch Between Delegate and Publisher
 
 ### Issue
