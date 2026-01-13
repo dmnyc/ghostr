@@ -30,6 +30,7 @@ export function SettingsPage() {
     relays,
     addRelay,
     removeRelay,
+    resetToDefaultRelays,
     useNIP65,
     setUseNIP65,
     nip65Relays,
@@ -396,6 +397,18 @@ export function SettingsPage() {
             />
             <Button onClick={handleAddRelay} size="icon">
               <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetToDefaultRelays()
+                toast({
+                  title: 'Reset to defaults',
+                  description: 'Relay list has been reset to default relays',
+                })
+              }}
+            >
+              Reset
             </Button>
           </div>
 

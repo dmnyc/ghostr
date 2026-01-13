@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_RELAYS as RELAY_URLS } from '@/lib/constants'
 
 type Role = 'delegate' | 'admin'
 type Theme = 'light' | 'dark' | 'system'
@@ -30,16 +31,17 @@ interface SettingsStore {
   setRelays: (relays: RelayConfig[]) => void
   addRelay: (url: string) => void
   removeRelay: (url: string) => void
+  resetToDefaultRelays: () => void
   setUseNIP65: (use: boolean) => void
   setNIP65Relays: (relays: RelayConfig[]) => void
   getActiveRelays: () => RelayConfig[]
 }
 
-const DEFAULT_RELAYS: RelayConfig[] = [
-  { url: 'wss://relay.damus.io', read: true, write: true },
-  { url: 'wss://nos.lol', read: true, write: true },
-  { url: 'wss://relay.nostr.band', read: true, write: true },
-]
+const DEFAULT_RELAYS: RelayConfig[] = RELAY_URLS.map(url => ({
+  url,
+  read: true,
+  write: true,
+}))
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
@@ -76,6 +78,8 @@ export const useSettingsStore = create<SettingsStore>()(
         const { relays } = get()
         set({ relays: relays.filter((r) => r.url !== url) })
       },
+
+      resetToDefaultRelays: () => set({ relays: DEFAULT_RELAYS }),
 
       setUseNIP65: (use) => set({ useNIP65: use }),
 
