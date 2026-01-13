@@ -85,8 +85,8 @@ The bot sends supplemental NIP-04 encrypted DMs that work across all major clien
 
 ### Setup
 
-1. Use the vanity bot keypair: `npub1gh0strl6djhzj2h7rcvzx7x902uc5esdd7gwhkv4599aqz8m4pys8ryan3`
-2. Create `.env` file:
+1. Generate a new Nostr keypair for your bot (use any key generation tool, or [rana](https://github.com/grunch/rana) for a vanity npub)
+2. Create `.env` file with the bot's private key:
    ```env
    VITE_BOT_NSEC=nsec1...your_bot_nsec_here
    ```
