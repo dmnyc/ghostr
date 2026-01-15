@@ -200,57 +200,50 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         setSearchQuery(query)
         setIsOpen(true)
 
-        // Calculate popover position
-        updatePopoverPosition(e.currentTarget, textBeforeCursor.length - match[0].length)
+        // Calculate popover position near cursor
+        updatePopoverPosition(e.currentTarget)
       } else {
         setIsOpen(false)
         setSearchQuery('')
       }
     }
 
-    // Update popover position based on cursor
-    const updatePopoverPosition = (element: HTMLDivElement, startIndex: number) => {
-      // Create a hidden div to measure text position
-      const div = document.createElement('div')
-      const style = window.getComputedStyle(element)
+    // Update popover position based on cursor using browser selection API
+    const updatePopoverPosition = (element: HTMLDivElement) => {
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0) {
+        // Fallback to top-left of element
+        setPopoverPosition({ top: 24, left: 0 })
+        return
+      }
 
-      // Copy element styles
-      div.style.cssText = `
-        position: absolute;
-        visibility: hidden;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        overflow: hidden;
-        width: ${element.clientWidth}px;
-        font: ${style.font};
-        padding: ${style.padding};
-        border: ${style.border};
-        line-height: ${style.lineHeight};
-      `
-
-      // Get text up to cursor
-      const textBeforeCursor = htmlToPlainText(element).substring(0, startIndex)
-      div.textContent = textBeforeCursor
-
-      // Add a span at the cursor position
-      const span = document.createElement('span')
-      span.textContent = '@'
-      div.appendChild(span)
-
-      document.body.appendChild(div)
-
-      const spanRect = span.getBoundingClientRect()
+      const range = selection.getRangeAt(0)
       const elementRect = element.getBoundingClientRect()
 
+      // Clone range and collapse to get caret position
+      const caretRange = range.cloneRange()
+      caretRange.collapse(false)
+
+      // Insert a temporary span to get accurate position
+      const tempSpan = document.createElement('span')
+      tempSpan.textContent = '\u200B' // Zero-width space
+      caretRange.insertNode(tempSpan)
+
+      const spanRect = tempSpan.getBoundingClientRect()
+
       // Calculate position relative to element
-      const top = spanRect.top - elementRect.top + element.scrollTop + 24
+      const top = spanRect.bottom - elementRect.top + element.scrollTop + 4
       const left = spanRect.left - elementRect.left
 
-      document.body.removeChild(div)
+      // Remove temp span and restore selection
+      tempSpan.remove()
+
+      // Normalize to merge adjacent text nodes
+      element.normalize()
 
       setPopoverPosition({
-        top: Math.min(top, element.clientHeight - 20),
-        left: Math.min(left, element.clientWidth - 200),
+        top: Math.min(top, element.clientHeight + 20),
+        left: Math.max(0, Math.min(left, element.clientWidth - 200)),
       })
     }
 
