@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Wifi, WifiOff, BookOpen, Pencil, Copy, Check, UserPlus, UserMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -6,7 +7,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { isBotEnabled, getBotPubkey } from '@/lib/ndk/botSigner'
@@ -17,7 +17,7 @@ import { isFollowing, followUser, unfollowUser } from '@/lib/nostr/follows'
 import { toast } from '@/hooks/useToast'
 
 export function SettingsPage() {
-  const { setCurrentView } = useUIStore()
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const { connectedRelays, fetchNIP65Relays } = useNDKStore()
   const {
@@ -160,7 +160,7 @@ export function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setCurrentView('main')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-2xl font-semibold">Settings</h1>
