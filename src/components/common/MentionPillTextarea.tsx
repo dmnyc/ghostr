@@ -300,11 +300,9 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
 
         range.insertNode(pill)
 
-        // Add space after pill
-        const space = document.createTextNode(' ')
+        // Position cursor after pill (no space added - user types it if needed)
         range.setStartAfter(pill)
-        range.insertNode(space)
-        range.collapse(false)
+        range.collapse(true)
 
         selection.removeAllRanges()
         selection.addRange(range)
@@ -323,7 +321,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       [contentEditableRef]
     )
 
-    // Handle paste events to prevent image pastes
+    // Handle paste events - strip formatting and prevent image pastes
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
       const items = e.clipboardData?.items
       if (!items) return
@@ -338,6 +336,28 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
             // User acknowledged
           }
           return
+        }
+      }
+
+      // For text pastes, strip all formatting and insert as plain text
+      e.preventDefault()
+      const plainText = e.clipboardData.getData('text/plain')
+      if (plainText) {
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0)
+          range.deleteContents()
+          const textNode = document.createTextNode(plainText)
+          range.insertNode(textNode)
+          range.setStartAfter(textNode)
+          range.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(range)
+
+          // Trigger input event to update parent state
+          if (contentEditableRef.current) {
+            handleInput({ currentTarget: contentEditableRef.current } as React.FormEvent<HTMLDivElement>)
+          }
         }
       }
     }
@@ -466,8 +486,8 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           )}
           style={{
             minHeight,
-            wordBreak: 'break-all',
-            overflowWrap: 'anywhere'
+            wordBreak: 'normal',
+            overflowWrap: 'break-word'
           }}
           data-placeholder={placeholder}
         />
