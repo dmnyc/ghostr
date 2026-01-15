@@ -271,13 +271,66 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         const range = selection.getRangeAt(0)
         const textBeforeCursor = getTextBeforeCursor(contentEditableRef.current)
 
-        // Find @ match
+        // Find @ match - include the full query that might be an npub
         const atMatch = textBeforeCursor.match(/@([\w]+)$/)
 
-        if (atMatch) {
-          const match = atMatch[0]
-          range.setStart(range.startContainer, range.startOffset - match.length)
-          range.deleteContents()
+        if (atMatch && atMatch[0]) {
+          const matchText = atMatch[0]
+          const matchLength = matchText.length
+
+          // Walk backwards through the DOM to find and delete the match
+          // This handles cases where the text might span multiple nodes
+          let remaining = matchLength
+          let currentNode = range.startContainer
+          let currentOffset = range.startOffset
+
+          // If we're in an element node, find the last text node
+          if (currentNode.nodeType === Node.ELEMENT_NODE) {
+            const textNodes: Text[] = []
+            const walker = document.createTreeWalker(
+              currentNode,
+              NodeFilter.SHOW_TEXT,
+              null
+            )
+            let node: Node | null
+            while ((node = walker.nextNode())) {
+              textNodes.push(node as Text)
+            }
+            if (textNodes.length > 0) {
+              currentNode = textNodes[textNodes.length - 1]!
+              currentOffset = (currentNode as Text).length
+            }
+          }
+
+          // Delete characters backwards
+          while (remaining > 0 && currentNode) {
+            if (currentNode.nodeType === Node.TEXT_NODE) {
+              const textNode = currentNode as Text
+              const deleteCount = Math.min(remaining, currentOffset)
+
+              if (deleteCount > 0) {
+                textNode.deleteData(currentOffset - deleteCount, deleteCount)
+                remaining -= deleteCount
+                currentOffset -= deleteCount
+              }
+
+              if (remaining > 0) {
+                // Move to previous sibling or parent's previous text node
+                let prev = currentNode.previousSibling
+                while (prev && prev.nodeType !== Node.TEXT_NODE) {
+                  prev = prev.previousSibling
+                }
+                if (prev) {
+                  currentNode = prev
+                  currentOffset = (prev as Text).length
+                } else {
+                  break
+                }
+              }
+            } else {
+              break
+            }
+          }
         }
 
         // Create nostr: URI
@@ -291,14 +344,18 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         pill.style.userSelect = 'all'
         pill.textContent = `@${getDisplayName(profile)}`
 
-        range.insertNode(pill)
+        // Insert at current cursor position
+        const newRange = document.createRange()
+        newRange.setStart(range.startContainer, range.startOffset)
+        newRange.collapse(true)
+        newRange.insertNode(pill)
 
         // Position cursor after pill (no space added - user types it if needed)
-        range.setStartAfter(pill)
-        range.collapse(true)
+        newRange.setStartAfter(pill)
+        newRange.collapse(true)
 
         selection.removeAllRanges()
-        selection.addRange(range)
+        selection.addRange(newRange)
 
         // Update mentioned profiles map
         setMentionedProfiles((prev) => new Map(prev).set(mention, profile))
