@@ -2,12 +2,13 @@ import { create } from 'zustand'
 import { useSettingsStore } from './settingsStore'
 
 type Role = 'delegate' | 'admin'
+type View = 'main' | 'settings' | 'ghost-notes'
 
 const ROLE_STORAGE_KEY = 'ghostr-active-role'
 
 interface UIStore {
   activeRole: Role
-  currentView: 'main' | 'settings'
+  currentView: View
   isLoginModalOpen: boolean
   isSubmitDialogOpen: boolean
   isPublishDialogOpen: boolean
@@ -16,7 +17,7 @@ interface UIStore {
   setActiveRole: (role: Role) => void
   toggleRole: () => void
   resetRoleToDefault: () => void
-  setCurrentView: (view: 'main' | 'settings') => void
+  setCurrentView: (view: View) => void
   setLoginModalOpen: (open: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
   setPublishDialogOpen: (open: boolean) => void

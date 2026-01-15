@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { User, LogOut, Moon, Sun, Monitor, Settings } from 'lucide-react'
+import { GhostNoteIcon } from '@/components/common/GhostNoteIcon'
 import { GhostrLogo } from '@/components/common/GhostrLogo'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,14 +18,17 @@ import { useAuthStore, pubkeyToNpub } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useSettingsStore, applyTheme } from '@/stores/settingsStore'
+import { useUnreadGhostNoteCount } from '@/stores/ghostNoteStore'
 import { RelayStatus } from '@/components/common/RelayStatus'
 import { cn } from '@/lib/utils/cn'
 
 export function Header() {
+  const navigate = useNavigate()
   const { isAuthenticated, user, profile, logout } = useAuthStore()
-  const { activeRole, setActiveRole, setLoginModalOpen, setCurrentView } = useUIStore()
+  const { activeRole, setActiveRole, setLoginModalOpen } = useUIStore()
   const { connectionStatus } = useNDKStore()
   const { theme, setTheme } = useSettingsStore()
+  const unreadGhostNotes = useUnreadGhostNoteCount()
   const [ghostAnimating, setGhostAnimating] = useState(false)
 
   // Apply theme on mount and when it changes
@@ -34,7 +39,12 @@ export function Header() {
   const handleLogoClick = () => {
     // Toggle animation on touch devices
     setGhostAnimating((prev) => !prev)
-    setCurrentView('main')
+    navigate('/dashboard')
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/')
   }
 
   const displayName = profile?.name || (user ? `${pubkeyToNpub(user.pubkey).slice(0, 12)}...` : 'Anonymous')
@@ -64,7 +74,10 @@ export function Header() {
           {isAuthenticated && (
             <div className="flex items-center bg-muted rounded-full p-1">
               <button
-                onClick={() => setActiveRole('delegate')}
+                onClick={() => {
+                  setActiveRole('delegate')
+                  navigate('/dashboard')
+                }}
                 className={cn(
                   'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
                   activeRole === 'delegate'
@@ -75,7 +88,10 @@ export function Header() {
                 Delegate
               </button>
               <button
-                onClick={() => setActiveRole('admin')}
+                onClick={() => {
+                  setActiveRole('admin')
+                  navigate('/dashboard')
+                }}
                 className={cn(
                   'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
                   activeRole === 'admin'
@@ -86,6 +102,24 @@ export function Header() {
                 Publisher
               </button>
             </div>
+          )}
+
+          {/* Ghost Notes Button */}
+          {isAuthenticated && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/ghost-notes')}
+              className="relative"
+              title="Ghost Notes"
+            >
+              <GhostNoteIcon className="h-5 w-5" />
+              {unreadGhostNotes > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center rounded-full">
+                  {unreadGhostNotes > 9 ? '9+' : unreadGhostNotes}
+                </span>
+              )}
+            </Button>
           )}
 
           {isAuthenticated ? (
@@ -139,11 +173,20 @@ export function Header() {
                 </DropdownMenuRadioGroup>
 
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setCurrentView('settings')}>
+                <DropdownMenuItem onClick={() => navigate('/ghost-notes')}>
+                  <GhostNoteIcon className="mr-2 h-4 w-4" />
+                  Ghost Notes
+                  {unreadGhostNotes > 0 && (
+                    <span className="ml-auto bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
+                      {unreadGhostNotes}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>

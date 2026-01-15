@@ -1,6 +1,6 @@
 {
   "name": "ghostr",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "Nostr delegation and approval workflow application",
   "type": "module",
   "scripts": {
@@ -37,6 +37,7 @@
     "nostr-tools": "^2.19.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-router-dom": "^7.12.0",
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
     "zustand": "^5.0.9"

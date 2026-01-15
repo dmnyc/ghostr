@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { initializeBotSigner } from '@/lib/ndk/botSigner'
@@ -11,7 +12,9 @@ initializeBotSigner()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryProvider>
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </QueryProvider>
   </StrictMode>,
 )
