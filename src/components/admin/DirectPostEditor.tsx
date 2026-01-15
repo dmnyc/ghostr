@@ -315,11 +315,13 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
       if (!isLongForm) {
         if (attachedImages.length > 0) {
-          finalContent += '\n\n' + attachedImages.join('\n')
+          // Only append images not already in content
+          const newImages = attachedImages.filter(url => !finalContent.includes(url))
+          if (newImages.length > 0) {
+            finalContent += '\n\n' + newImages.join('\n')
+          }
         }
-        if (attachedLinks.length > 0) {
-          finalContent += '\n\n' + attachedLinks.map(l => l.url).join('\n')
-        }
+        // Don't append links - they're already in the content (auto-detected from typing)
       } else {
         // For long-form markdown, normalize line breaks: convert single \n to \n\n for proper paragraph breaks
         finalContent = finalContent.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
