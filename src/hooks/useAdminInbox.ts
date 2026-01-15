@@ -11,7 +11,7 @@ const GIFT_WRAP_KIND = 1059
 export function useAdminInbox(idsReady: boolean = true) {
   const { ndk } = useNDKStore()
   const { user, isAuthenticated } = useAuthStore()
-  const { addSubmission, isProcessed, setLoading } = useSubmissionStore()
+  const { addSubmission, isProcessed, setLoading, archivedIds } = useSubmissionStore()
   const subscriptionRef = useRef<NDKSubscription | null>(null)
 
   useEffect(() => {
@@ -54,8 +54,8 @@ export function useAdminInbox(idsReady: boolean = true) {
 
           const payload = unwrapped.payload as SubmissionPayload
 
-          // Check if already processed
-          if (isProcessed(payload.id)) {
+          // Check if already processed or archived
+          if (isProcessed(payload.id) || archivedIds.has(payload.id)) {
             return
           }
 
@@ -84,5 +84,5 @@ export function useAdminInbox(idsReady: boolean = true) {
         subscriptionRef.current = null
       }
     }
-  }, [ndk, user, isAuthenticated, idsReady, addSubmission, isProcessed, setLoading])
+  }, [ndk, user, isAuthenticated, idsReady, addSubmission, isProcessed, archivedIds, setLoading])
 }
