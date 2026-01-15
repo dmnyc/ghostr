@@ -263,14 +263,9 @@ export function ReceivedGhostNotes() {
         markAsRead(selectedNote.id)
         // Don't persist decrypted content - single view only
 
-        // Always send read receipt to notify sender
+        // Send read receipt via Ghostr bot
         if (selectedNote.eventId) {
-          sendReadReceipt(
-            selectedNote.eventId,
-            selectedNote.counterpartyPubkey
-          ).catch((err) => {
-            console.warn('[ReceivedGhostNotes] Failed to send receipt:', err)
-          })
+          sendReadReceipt(selectedNote.eventId, selectedNote.counterpartyPubkey)
         }
       } else {
         throw new Error(result.error || 'Decryption failed')

@@ -268,52 +268,25 @@ export async function revokeGhostNote(
 }
 
 /**
- * Send a read receipt for a Ghost Note (NIP-04 encrypted DM)
+ * Send a read receipt for a Ghost Note using the Ghostr bot
  */
-export async function sendReadReceipt(
-  ghostNoteEventId: string,
+export function sendReadReceipt(
+  _ghostNoteEventId: string,
   senderPubkey: string
-): Promise<boolean> {
-  const { ndk } = useNDKStore.getState()
-  const { signer } = useAuthStore.getState()
+): void {
+  const readTime = new Date().toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 
-  if (!ndk || !signer) {
-    return false
-  }
+  sendBotNotification(
+    senderPubkey,
+    `👻 Your Ghost Note was read on ${readTime}. The message has self-destructed and can no longer be viewed.`
+  )
 
-  try {
-    const sender = new NDKUser({ pubkey: senderPubkey })
-    const message = `Ghost Note read at ${new Date().toISOString()}`
-
-    // Encrypt with NIP-04 for maximum compatibility
-    const encryptedContent = await signer.encrypt(sender, message, 'nip04')
-
-    // Create kind 4 DM with special tag
-    const dmEvent = new NDKEvent(ndk)
-    dmEvent.kind = 4
-    dmEvent.content = encryptedContent
-    dmEvent.created_at = Math.floor(Date.now() / 1000)
-    dmEvent.tags = [
-      ['p', senderPubkey],
-      ['e', ghostNoteEventId],
-      ['ghost-note-read'],
-    ]
-
-    await dmEvent.sign(signer)
-
-    // Publish with timeout
-    const publishPromise = dmEvent.publish()
-    const timeoutPromise = new Promise<void>((resolve) =>
-      setTimeout(resolve, 3000)
-    )
-    await Promise.race([publishPromise, timeoutPromise])
-
-    console.log('[GhostNote] Read receipt sent to', senderPubkey.slice(0, 8))
-    return true
-  } catch (error) {
-    console.error('[GhostNote] Failed to send read receipt:', error)
-    return false
-  }
+  console.log('[GhostNote] Read receipt sent to', senderPubkey.slice(0, 8))
 }
 
 /**

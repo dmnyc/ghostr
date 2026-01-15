@@ -188,11 +188,9 @@ export function GhostNoteViewer() {
         // Mark as read
         markAsRead(ghostNote.id)
 
-        // Send read receipt
+        // Send read receipt via Ghostr bot
         if (ghostNote.eventId) {
-          sendReadReceipt(ghostNote.eventId, ghostNote.counterpartyPubkey).catch(
-            (err) => console.warn('[GhostNoteViewer] Failed to send receipt:', err)
-          )
+          sendReadReceipt(ghostNote.eventId, ghostNote.counterpartyPubkey)
         }
       } else {
         throw new Error(result.error || 'Decryption failed')
