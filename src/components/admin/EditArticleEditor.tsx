@@ -45,9 +45,9 @@ export function EditArticleEditor({
   const [originalTitle, setOriginalTitle] = useState(item.title ?? "");
   const [originalSummary, setOriginalSummary] = useState(item.summary ?? "");
   const [originalContent, setOriginalContent] = useState(item.content);
-  const [originalCoverImage, setOriginalCoverImage] = useState<string | undefined>(
-    item.coverImage,
-  );
+  const [originalCoverImage, setOriginalCoverImage] = useState<
+    string | undefined
+  >(item.coverImage);
 
   // Fetch full event content if it's missing (e.g., loaded from history without full content)
   useEffect(() => {
@@ -80,7 +80,14 @@ export function EditArticleEditor({
                 limit: 1,
               };
 
-          const events = await ndk.fetchEvents(filter);
+          const fetchPromise = ndk.fetchEvents(filter);
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), 10000),
+          );
+          const events = await Promise.race([fetchPromise, timeoutPromise]);
+          if (!events) {
+            throw new Error("Fetch timed out");
+          }
           const event = Array.from(events)[0];
 
           if (event && event.content) {
@@ -131,7 +138,16 @@ export function EditArticleEditor({
       content !== originalContent ||
       coverImage !== originalCoverImage
     );
-  }, [title, originalTitle, summary, originalSummary, content, originalContent, coverImage, originalCoverImage]);
+  }, [
+    title,
+    originalTitle,
+    summary,
+    originalSummary,
+    content,
+    originalContent,
+    coverImage,
+    originalCoverImage,
+  ]);
 
   const handlePublish = async () => {
     if (!content.trim()) {
@@ -165,7 +181,10 @@ export function EditArticleEditor({
 
     try {
       // Normalize line breaks for markdown: convert single \n to \n\n for proper paragraph breaks
-      const normalizedContent = content.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
+      const normalizedContent = content.replace(
+        /([^\n])\n([^\n])/g,
+        "$1\n\n$2",
+      );
 
       const event = new NDKEvent(ndk);
       event.kind = 30023;
@@ -236,13 +255,20 @@ export function EditArticleEditor({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="shrink-0"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-xl font-bold">Edit Article</h1>
             <p className="text-sm text-muted-foreground">
-              {isLoadingContent ? "Loading article content..." : "Update and republish this article"}
+              {isLoadingContent
+                ? "Loading article content..."
+                : "Update and republish this article"}
             </p>
           </div>
         </div>
@@ -257,7 +283,10 @@ export function EditArticleEditor({
             />
             Credit Ghostr
           </label>
-          <Button onClick={handlePublish} disabled={isPublishing || !hasChanges}>
+          <Button
+            onClick={handlePublish}
+            disabled={isPublishing || !hasChanges}
+          >
             {isPublishing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -290,7 +319,8 @@ export function EditArticleEditor({
               maxLength={200}
             />
             <p className="text-xs text-muted-foreground">
-              {summary.length}/200 characters - Helps readers discover your article
+              {summary.length}/200 characters - Helps readers discover your
+              article
             </p>
           </div>
 
