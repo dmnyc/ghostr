@@ -45,7 +45,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     try {
       console.log("[Auth] Creating NIP-07 signer...");
-      const signer = await createNIP07Signer();
+      // Wait for extension when user explicitly clicks login (mobile signers inject late)
+      const signer = await createNIP07Signer(true);
       console.log("[Auth] Signer ready, getting user...");
       const user = await signer.user();
       console.log("[Auth] User pubkey:", user.pubkey.slice(0, 8) + "...");
