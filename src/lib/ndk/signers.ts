@@ -1,7 +1,12 @@
 import {
   NDKNip07Signer,
   NDKPrivateKeySigner,
+  NDKRelay,
+  NDKUser,
+  type NDK,
+  type NDKEncryptionScheme,
   type NDKSigner,
+  type NostrEvent,
 } from "@nostr-dev-kit/ndk";
 import { nip19 } from "nostr-tools";
 
@@ -98,6 +103,137 @@ export function applySignerTimeouts(
   }
 
   return signer;
+}
+
+class WindowNostrSigner implements NDKSigner {
+  private readonly userValue: NDKUser;
+  private readonly pubkeyValue: string;
+
+  constructor(pubkey: string) {
+    this.pubkeyValue = pubkey;
+    this.userValue = new NDKUser({ pubkey });
+  }
+
+  get pubkey(): string {
+    return this.pubkeyValue;
+  }
+
+  async blockUntilReady(): Promise<NDKUser> {
+    return this.userValue;
+  }
+
+  async user(): Promise<NDKUser> {
+    return this.userValue;
+  }
+
+  get userSync(): NDKUser {
+    return this.userValue;
+  }
+
+  async sign(event: NostrEvent): Promise<string> {
+    const signedEvent = await window.nostr?.signEvent?.(event);
+    if (!signedEvent?.sig) {
+      throw new Error("Failed to sign event");
+    }
+    return signedEvent.sig;
+  }
+
+  async relays(ndk?: NDK): Promise<NDKRelay[]> {
+    const relays = (await window.nostr?.getRelays?.()) || {};
+    const activeRelays = [];
+    for (const url of Object.keys(relays)) {
+      if (relays[url].read && relays[url].write) {
+        activeRelays.push(url);
+      }
+    }
+    return activeRelays.map(
+      (url) => new NDKRelay(url, ndk?.relayAuthDefaultPolicy, ndk),
+    );
+  }
+
+  async encryptionEnabled(
+    scheme?: NDKEncryptionScheme,
+  ): Promise<NDKEncryptionScheme[]> {
+    const enabled: NDKEncryptionScheme[] = [];
+    if (
+      (!scheme || scheme === "nip04") &&
+      Boolean(window.nostr?.nip04?.encrypt && window.nostr?.nip04?.decrypt)
+    ) {
+      enabled.push("nip04");
+    }
+    if (
+      (!scheme || scheme === "nip44") &&
+      Boolean(window.nostr?.nip44?.encrypt && window.nostr?.nip44?.decrypt)
+    ) {
+      enabled.push("nip44");
+    }
+    return enabled;
+  }
+
+  async encrypt(
+    recipient: NDKUser,
+    value: string,
+    scheme: NDKEncryptionScheme = "nip04",
+  ): Promise<string> {
+    const nostr = window.nostr;
+    if (!nostr) {
+      throw new Error("No NIP-07 extension detected");
+    }
+    if (scheme === "nip44") {
+      if (!nostr.nip44?.encrypt) {
+        throw new Error("nip44 encryption is not available");
+      }
+      return nostr.nip44.encrypt(recipient.pubkey, value);
+    }
+    if (!nostr.nip04?.encrypt) {
+      throw new Error("nip04 encryption is not available");
+    }
+    return nostr.nip04.encrypt(recipient.pubkey, value);
+  }
+
+  async decrypt(
+    sender: NDKUser,
+    value: string,
+    scheme: NDKEncryptionScheme = "nip04",
+  ): Promise<string> {
+    const nostr = window.nostr;
+    if (!nostr) {
+      throw new Error("No NIP-07 extension detected");
+    }
+    if (scheme === "nip44") {
+      if (!nostr.nip44?.decrypt) {
+        throw new Error("nip44 decryption is not available");
+      }
+      return nostr.nip44.decrypt(sender.pubkey, value);
+    }
+    if (!nostr.nip04?.decrypt) {
+      throw new Error("nip04 decryption is not available");
+    }
+    return nostr.nip04.decrypt(sender.pubkey, value);
+  }
+
+  toPayload(): string {
+    return JSON.stringify({ type: "nip07", payload: "" });
+  }
+}
+
+export async function createWindowNostrSigner(
+  timeoutMs: number = 10000,
+): Promise<NDKSigner> {
+  if (typeof window === "undefined" || !window.nostr) {
+    throw new Error(
+      "No NIP-07 extension detected. Please install Alby or nos2x.",
+    );
+  }
+  const pubkey = await withTimeout(
+    window.nostr.getPublicKey(),
+    timeoutMs,
+    "NIP-07 getPublicKey",
+  );
+  if (!pubkey) {
+    throw new Error("User rejected access");
+  }
+  return new WindowNostrSigner(pubkey);
 }
 
 /**

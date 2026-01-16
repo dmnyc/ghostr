@@ -8,6 +8,7 @@ import {
   applySignerTimeouts,
   createNIP07Signer,
   createNSECSigner,
+  createWindowNostrSigner,
   isInAppWebView,
   withTimeout,
 } from "@/lib/ndk/signers";
@@ -57,11 +58,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const timeoutMs = inApp ? 15000 : 0;
       console.log("[Auth] Creating NIP-07 signer...");
       // Wait for extension when user explicitly clicks login (mobile signers inject late)
-      const signer = await withTimeout(
-        createNIP07Signer(true),
-        timeoutMs,
-        "NIP-07 init",
-      );
+      const signer = inApp
+        ? await createWindowNostrSigner(timeoutMs || 10000)
+        : await withTimeout(createNIP07Signer(true), timeoutMs, "NIP-07 init");
       const wrappedSigner = applySignerTimeouts(signer, {
         enabled: inApp,
         timeoutMs,
