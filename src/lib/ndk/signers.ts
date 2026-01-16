@@ -159,7 +159,7 @@ export async function createNIP07Signer(
   }
 
   const signer = new NDKNip07Signer();
-  await signer.blockUntilReady();
+  await signer.user();
   return signer;
 }
 

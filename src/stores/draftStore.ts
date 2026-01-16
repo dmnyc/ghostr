@@ -6,6 +6,7 @@ import {
   saveDraftNIP37,
   deleteDraftNIP37,
 } from '@/lib/nostr/nip37'
+import { isInAppWebView, withTimeout } from '@/lib/ndk/signers'
 
 const DRAFTS_CACHE_KEY = 'ghostr-drafts-cache'
 
@@ -181,7 +182,12 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const { drafts: relayDrafts, deletedIds } = await loadDraftsWithMigration()
+        const timeoutMs = isInAppWebView() ? 15000 : 0
+        const { drafts: relayDrafts, deletedIds } = await withTimeout(
+          loadDraftsWithMigration(),
+          timeoutMs,
+          'Drafts load',
+        )
         console.log('[DraftStore] Loaded', relayDrafts.length, 'drafts from relay on attempt', attempt, 'with', deletedIds.size, 'deletions')
 
         // Merge with any locally-created drafts that haven't synced yet

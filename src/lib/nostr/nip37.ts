@@ -337,6 +337,11 @@ export async function loadDraftsWithMigration(): Promise<LoadDraftsResult> {
   const legacyDrafts = await loadLegacyDrafts()
 
   if (legacyDrafts.length > 0) {
+    if (isInAppWebView()) {
+      console.log('[NIP-37] In-app browser detected, skipping migration')
+      return { drafts: legacyDrafts, deletedIds: new Set() }
+    }
+
     console.log(`Migrating ${legacyDrafts.length} drafts from NIP-78 to NIP-37...`)
 
     // Migrate each draft to NIP-37 format
