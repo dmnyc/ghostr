@@ -4,7 +4,13 @@ import { nip19 } from "nostr-tools";
 import { useNDKStore } from "./ndkStore";
 import { useDraftStore } from "./draftStore";
 import { useSubmissionStore } from "./submissionStore";
-import { createNIP07Signer, createNSECSigner } from "@/lib/ndk/signers";
+import {
+  applySignerTimeouts,
+  createNIP07Signer,
+  createNSECSigner,
+  isInAppWebView,
+  withTimeout,
+} from "@/lib/ndk/signers";
 
 type SignerType = "nip07" | "nsec" | null;
 
@@ -41,25 +47,43 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   error: null,
 
   loginWithNIP07: async () => {
+    if (get().isLoading) {
+      return;
+    }
     set({ isLoading: true, error: null });
 
     try {
+      const inApp = isInAppWebView();
+      const timeoutMs = inApp ? 15000 : 0;
       console.log("[Auth] Creating NIP-07 signer...");
       // Wait for extension when user explicitly clicks login (mobile signers inject late)
-      const signer = await createNIP07Signer(true);
+      const signer = await withTimeout(
+        createNIP07Signer(true),
+        timeoutMs,
+        "NIP-07 init",
+      );
+      const wrappedSigner = applySignerTimeouts(signer, {
+        enabled: inApp,
+        timeoutMs,
+        labelPrefix: "NIP-07",
+      });
       console.log("[Auth] Signer ready, getting user...");
-      const user = await signer.user();
+      const user = await withTimeout(
+        wrappedSigner.user(),
+        timeoutMs,
+        "NIP-07 getPublicKey",
+      );
       console.log("[Auth] User pubkey:", user.pubkey.slice(0, 8) + "...");
 
       const { ndk } = useNDKStore.getState();
       if (ndk) {
-        ndk.signer = signer;
+        ndk.signer = wrappedSigner;
       }
 
       set({
         isAuthenticated: true,
         user,
-        signer,
+        signer: wrappedSigner,
         signerType: "nip07",
         isLoading: false,
       });
@@ -76,17 +100,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .fetchNIP65Relays(user.pubkey)
         .catch(() => {});
     } catch (error) {
+      const baseMessage =
+        error instanceof Error ? error.message : "Failed to login with NIP-07";
+      const message =
+        isInAppWebView() && baseMessage.includes("timed out")
+          ? `${baseMessage}. If this is Keychat's in-app browser, try again or use NSEC login.`
+          : baseMessage;
       set({
         isLoading: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to login with NIP-07",
+        error: message,
       });
     }
   },
 
   loginWithNSEC: async (nsec: string) => {
+    if (get().isLoading) {
+      return;
+    }
     set({ isLoading: true, error: null });
 
     try {

@@ -2,6 +2,7 @@ import NDK, { NDKEvent } from '@nostr-dev-kit/ndk'
 import type { Draft } from '@/types/draft'
 import type { PublisherDraft } from '@/types/publisherDraft'
 import { NIP37_DRAFT_KIND, DRAFT_KIND, DRAFT_D_TAG } from '@/lib/constants'
+import { isInAppWebView, withTimeout } from '@/lib/ndk/signers'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -75,6 +76,13 @@ function payloadToDraft(id: string, payload: DraftPayload): Draft {
     archived: payload.archived,
     uploadedImages: payload.uploadedImages,
   }
+}
+
+const PUBLISH_TIMEOUT_MS = 12000
+
+async function publishWithTimeout(event: NDKEvent, label: string): Promise<void> {
+  const timeoutMs = isInAppWebView() ? PUBLISH_TIMEOUT_MS : 0
+  await withTimeout(event.publish(), timeoutMs, label)
 }
 
 /**
@@ -230,7 +238,7 @@ export async function saveDraftNIP37(draft: Draft): Promise<void> {
     ['client', 'ghostr'],
   ]
 
-  await event.publish()
+  await publishWithTimeout(event, 'NIP-37 publish draft')
 }
 
 /**
@@ -254,7 +262,7 @@ export async function deleteDraftNIP37(draftId: string, targetKind: 1 | 30023 = 
     ['client', 'ghostr'],
   ]
 
-  await event.publish()
+  await publishWithTimeout(event, 'NIP-37 delete draft')
 }
 
 /**
@@ -307,7 +315,7 @@ export async function deleteLegacyDraftsEvent(): Promise<void> {
   event.content = ''
   event.tags = [['d', DRAFT_D_TAG]]
 
-  await event.publish()
+  await publishWithTimeout(event, 'NIP-78 delete legacy drafts')
 }
 
 /**
@@ -509,7 +517,7 @@ export async function savePublisherDraftNIP37(draft: PublisherDraft): Promise<vo
     ['client', 'ghostr-publisher'],
   ]
 
-  await event.publish()
+  await publishWithTimeout(event, 'NIP-37 publish publisher draft')
 }
 
 /**
@@ -533,5 +541,5 @@ export async function deletePublisherDraftNIP37(draftId: string, targetKind: 1 |
     ['client', 'ghostr-publisher'],
   ]
 
-  await event.publish()
+  await publishWithTimeout(event, 'NIP-37 delete publisher draft')
 }

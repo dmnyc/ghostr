@@ -1,4 +1,8 @@
-import { NDKNip07Signer, NDKPrivateKeySigner } from "@nostr-dev-kit/ndk";
+import {
+  NDKNip07Signer,
+  NDKPrivateKeySigner,
+  type NDKSigner,
+} from "@nostr-dev-kit/ndk";
 import { nip19 } from "nostr-tools";
 
 export interface SignerCapabilities {
@@ -10,6 +14,90 @@ export interface SignerCapabilities {
 
 export function hasNIP07Extension(): boolean {
   return typeof window !== "undefined" && !!window.nostr;
+}
+
+export function isInAppWebView(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as typeof window & { flutter_inappwebview?: unknown };
+  if (w.flutter_inappwebview) return true;
+  if (typeof navigator === "undefined") return false;
+  return /keychat/i.test(navigator.userAgent);
+}
+
+export function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise;
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
+
+type SignerWithTimeoutFlag = NDKSigner & { __ghostrTimeoutWrapped?: boolean };
+
+export function applySignerTimeouts(
+  signer: NDKSigner,
+  options: {
+    enabled?: boolean;
+    timeoutMs?: number;
+    labelPrefix?: string;
+  } = {},
+): NDKSigner {
+  const enabled = options.enabled ?? isInAppWebView();
+  if (!enabled) return signer;
+
+  const wrapped = signer as SignerWithTimeoutFlag;
+  if (wrapped.__ghostrTimeoutWrapped) return signer;
+  wrapped.__ghostrTimeoutWrapped = true;
+
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const labelPrefix = options.labelPrefix ?? "NIP-07";
+
+  if (typeof signer.sign === "function") {
+    const originalSign = signer.sign.bind(signer);
+    signer.sign = ((event) =>
+      withTimeout(
+        originalSign(event),
+        timeoutMs,
+        `${labelPrefix} signEvent`,
+      )) as NDKSigner["sign"];
+  }
+
+  if (typeof signer.encrypt === "function") {
+    const originalEncrypt = signer.encrypt.bind(signer);
+    signer.encrypt = ((recipient, value, nip) =>
+      withTimeout(
+        originalEncrypt(recipient, value, nip),
+        timeoutMs,
+        `${labelPrefix} encrypt`,
+      )) as NDKSigner["encrypt"];
+  }
+
+  if (typeof signer.decrypt === "function") {
+    const originalDecrypt = signer.decrypt.bind(signer);
+    signer.decrypt = ((sender, value, nip) =>
+      withTimeout(
+        originalDecrypt(sender, value, nip),
+        timeoutMs,
+        `${labelPrefix} decrypt`,
+      )) as NDKSigner["decrypt"];
+  }
+
+  return signer;
 }
 
 /**
