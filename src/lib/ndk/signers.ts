@@ -53,11 +53,18 @@ async function waitForNostrExtension(
   return false;
 }
 
-export async function createNIP07Signer(): Promise<NDKNip07Signer> {
-  // Wait up to 5 seconds for mobile signers to inject window.nostr
-  const extensionAvailable = await waitForNostrExtension(5000);
-
-  if (!extensionAvailable) {
+export async function createNIP07Signer(
+  waitForExtension: boolean = false,
+): Promise<NDKNip07Signer> {
+  // Optionally wait for mobile signers to inject window.nostr
+  if (waitForExtension) {
+    const extensionAvailable = await waitForNostrExtension(5000);
+    if (!extensionAvailable) {
+      throw new Error(
+        "No NIP-07 extension detected. Please install Alby or nos2x.",
+      );
+    }
+  } else if (!hasNIP07Extension()) {
     throw new Error(
       "No NIP-07 extension detected. Please install Alby or nos2x.",
     );
