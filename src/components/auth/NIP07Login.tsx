@@ -185,45 +185,6 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
       });
     }
 
-    if (pubkey && typeof nostr.signEvent === "function") {
-      try {
-        const start = now();
-        const event = {
-          kind: 1,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [],
-          content: "ghostr sign test",
-          pubkey,
-        };
-        const signed = await withTimeout(
-          nostr.signEvent(event),
-          10000,
-          "signEvent",
-        );
-        const durationMs = Math.round(now() - start);
-        lines.push({
-          label: "signEvent",
-          value: signed?.sig ? `ok (${durationMs}ms)` : "no signature",
-          status: signed?.sig ? "ok" : "error",
-        });
-      } catch (diagError) {
-        lines.push({
-          label: "signEvent",
-          value:
-            diagError instanceof Error
-              ? diagError.message
-              : "failed to resolve",
-          status: "error",
-        });
-      }
-    } else {
-      lines.push({
-        label: "signEvent",
-        value: "missing",
-        status: "warn",
-      });
-    }
-
     setDiagnostics(lines);
     setIsDiagnosing(false);
   };
