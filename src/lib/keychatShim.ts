@@ -17,28 +17,65 @@ export function initializeKeychatShim(): void {
       w.flutter_inappwebview,
     );
 
+    const withTimeout = async <T>(
+      promise: Promise<T>,
+      timeoutMs: number,
+      label: string,
+    ): Promise<T> => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+
+      return Promise.race([promise, timeoutPromise]).finally(() => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }) as Promise<T>;
+    };
+
     type NostrSignEvent = NonNullable<
       NonNullable<typeof window.nostr>["signEvent"]
     >;
     type NostrEventParam = Parameters<NostrSignEvent>[0];
     type NostrSignedEvent = Awaited<ReturnType<NostrSignEvent>>;
+    type Nip04 = NonNullable<NonNullable<typeof window.nostr>["nip04"]>;
+    type Nip44 = NonNullable<NonNullable<typeof window.nostr>["nip44"]>;
 
     let signing = false;
+    const queueDelayMs = 200;
+    const handlerTimeoutMs = 15000;
     const queue: {
-      event: NostrEventParam;
-      resolve: (value: NostrSignedEvent) => void;
-      reject: (reason?: Error) => void;
+      run: () => Promise<unknown>;
+      resolve: (value: unknown) => void;
+      reject: (reason?: unknown) => void;
     }[] = [];
 
     const originalSignEvent = nostr.signEvent?.bind(nostr) as
       | NostrSignEvent
       | undefined;
 
+    const enqueue = <T>(run: () => Promise<T>): Promise<T> =>
+      new Promise<T>((resolve, reject) => {
+        queue.push({
+          run: run as () => Promise<unknown>,
+          resolve: resolve as (value: unknown) => void,
+          reject,
+        });
+        processQueue();
+      });
+
     const signWithHandler = async (
       event: NostrEventParam,
     ): Promise<NostrSignedEvent> => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      const res = await callHandler("keychat-nostr", "signEvent", event);
+      await new Promise((resolve) => setTimeout(resolve, queueDelayMs));
+      const res = await withTimeout(
+        callHandler("keychat-nostr", "signEvent", event),
+        handlerTimeoutMs,
+        "keychat signEvent",
+      );
       let parsed: unknown = res;
       if (typeof res === "string") {
         try {
@@ -67,25 +104,10 @@ export function initializeKeychatShim(): void {
       }
 
       try {
-        const signed = await signWithHandler(item.event);
+        const signed = await item.run();
         item.resolve(signed);
       } catch (error) {
-        if (originalSignEvent) {
-          try {
-            const signed = await originalSignEvent(item.event);
-            item.resolve(signed);
-          } catch (fallbackError) {
-            item.reject(
-              fallbackError instanceof Error
-                ? fallbackError
-                : new Error(String(fallbackError)),
-            );
-          }
-        } else {
-          item.reject(
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        }
+        item.reject(error instanceof Error ? error : new Error(String(error)));
       }
 
       signing = false;
@@ -94,11 +116,107 @@ export function initializeKeychatShim(): void {
 
     // Queue sign requests to avoid concurrent in-app signer prompts.
     const queuedSignEvent: NostrSignEvent = (event) =>
-      new Promise<NostrSignedEvent>((resolve, reject) => {
-        queue.push({ event, resolve, reject });
-        processQueue();
+      enqueue(async () => {
+        try {
+          return await signWithHandler(event);
+        } catch (error) {
+          if (!originalSignEvent) {
+            throw error;
+          }
+          return originalSignEvent(event);
+        }
       });
     nostr.signEvent = queuedSignEvent;
+
+    const nip04 = nostr.nip04;
+    if (nip04?.encrypt) {
+      const originalEncrypt = nip04.encrypt.bind(nip04) as
+        | Nip04["encrypt"]
+        | undefined;
+      nip04.encrypt = (pubkey, plaintext) =>
+        enqueue(async () => {
+          try {
+            const res = await withTimeout(
+              callHandler("keychat-nostr", "nip04Encrypt", pubkey, plaintext),
+              handlerTimeoutMs,
+              "keychat nip04 encrypt",
+            );
+            return typeof res === "string" ? res : String(res ?? "");
+          } catch (error) {
+            if (!originalEncrypt) {
+              throw error;
+            }
+            return originalEncrypt(pubkey, plaintext);
+          }
+        });
+    }
+
+    if (nip04?.decrypt) {
+      const originalDecrypt = nip04.decrypt.bind(nip04) as
+        | Nip04["decrypt"]
+        | undefined;
+      nip04.decrypt = (pubkey, ciphertext) =>
+        enqueue(async () => {
+          try {
+            const res = await withTimeout(
+              callHandler("keychat-nostr", "nip04Decrypt", pubkey, ciphertext),
+              handlerTimeoutMs,
+              "keychat nip04 decrypt",
+            );
+            return typeof res === "string" ? res : String(res ?? "");
+          } catch (error) {
+            if (!originalDecrypt) {
+              throw error;
+            }
+            return originalDecrypt(pubkey, ciphertext);
+          }
+        });
+    }
+
+    const nip44 = nostr.nip44;
+    if (nip44?.encrypt) {
+      const originalEncrypt = nip44.encrypt.bind(nip44) as
+        | Nip44["encrypt"]
+        | undefined;
+      nip44.encrypt = (pubkey, plaintext) =>
+        enqueue(async () => {
+          try {
+            const res = await withTimeout(
+              callHandler("keychat-nostr", "nip44Encrypt", pubkey, plaintext),
+              handlerTimeoutMs,
+              "keychat nip44 encrypt",
+            );
+            return typeof res === "string" ? res : String(res ?? "");
+          } catch (error) {
+            if (!originalEncrypt) {
+              throw error;
+            }
+            return originalEncrypt(pubkey, plaintext);
+          }
+        });
+    }
+
+    if (nip44?.decrypt) {
+      const originalDecrypt = nip44.decrypt.bind(nip44) as
+        | Nip44["decrypt"]
+        | undefined;
+      nip44.decrypt = (pubkey, ciphertext) =>
+        enqueue(async () => {
+          try {
+            const res = await withTimeout(
+              callHandler("keychat-nostr", "nip44Decrypt", pubkey, ciphertext),
+              handlerTimeoutMs,
+              "keychat nip44 decrypt",
+            );
+            return typeof res === "string" ? res : String(res ?? "");
+          } catch (error) {
+            if (!originalDecrypt) {
+              throw error;
+            }
+            return originalDecrypt(pubkey, ciphertext);
+          }
+        });
+    }
 
     nostr.__ghostrShim = true;
     return true;
