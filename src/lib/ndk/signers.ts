@@ -139,6 +139,7 @@ class WindowNostrSigner implements NDKSigner {
   }
 
   async relays(ndk?: NDK): Promise<NDKRelay[]> {
+    if (!ndk) return [];
     const relays =
       (await window.nostr?.getRelays?.()) ??
       ({} as Record<string, { read?: boolean; write?: boolean }>);
@@ -149,7 +150,7 @@ class WindowNostrSigner implements NDKSigner {
       }
     }
     return activeRelays.map(
-      (url) => new NDKRelay(url, ndk?.relayAuthDefaultPolicy, ndk),
+      (url) => new NDKRelay(url, ndk.relayAuthDefaultPolicy, ndk),
     );
   }
 
