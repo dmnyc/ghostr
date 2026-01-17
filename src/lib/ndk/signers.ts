@@ -1,9 +1,9 @@
+import type NDK from "@nostr-dev-kit/ndk";
 import {
   NDKNip07Signer,
   NDKPrivateKeySigner,
   NDKRelay,
   NDKUser,
-  type NDK,
   type NDKEncryptionScheme,
   type NDKSigner,
   type NostrEvent,
@@ -139,10 +139,12 @@ class WindowNostrSigner implements NDKSigner {
   }
 
   async relays(ndk?: NDK): Promise<NDKRelay[]> {
-    const relays = (await window.nostr?.getRelays?.()) || {};
-    const activeRelays = [];
-    for (const url of Object.keys(relays)) {
-      if (relays[url].read && relays[url].write) {
+    const relays =
+      (await window.nostr?.getRelays?.()) ??
+      ({} as Record<string, { read?: boolean; write?: boolean }>);
+    const activeRelays: string[] = [];
+    for (const [url, perms] of Object.entries(relays)) {
+      if (perms?.read && perms?.write) {
         activeRelays.push(url);
       }
     }

@@ -4,30 +4,39 @@ export function initializeKeychatShim(): void {
     flutter_inappwebview?: {
       callHandler?: (name: string, ...args: unknown[]) => Promise<unknown>;
     };
-    nostr?: {
-      signEvent?: (event: Record<string, unknown>) => Promise<unknown>;
-      __ghostrShim?: boolean;
-    };
   };
 
   const applyShim = () => {
-    if (!w.flutter_inappwebview?.callHandler || !w.nostr) return false;
-    if (w.nostr.__ghostrShim) return true;
+    const nostr =
+      (w.nostr as typeof window.nostr & { __ghostrShim?: boolean }) ??
+      undefined;
+    if (!w.flutter_inappwebview?.callHandler || !nostr) return false;
+    if (nostr.__ghostrShim) return true;
 
     const callHandler = w.flutter_inappwebview.callHandler.bind(
       w.flutter_inappwebview,
     );
 
+    type NostrSignEvent = NonNullable<
+      NonNullable<typeof window.nostr>["signEvent"]
+    >;
+    type NostrEventParam = Parameters<NostrSignEvent>[0];
+    type NostrSignedEvent = Awaited<ReturnType<NostrSignEvent>>;
+
     let signing = false;
     const queue: {
-      event: Record<string, unknown>;
-      resolve: (value: unknown) => void;
+      event: NostrEventParam;
+      resolve: (value: NostrSignedEvent) => void;
       reject: (reason?: Error) => void;
     }[] = [];
 
-    const originalSignEvent = w.nostr.signEvent?.bind(w.nostr);
+    const originalSignEvent = nostr.signEvent?.bind(nostr) as
+      | NostrSignEvent
+      | undefined;
 
-    const signWithHandler = async (event: Record<string, unknown>) => {
+    const signWithHandler = async (
+      event: NostrEventParam,
+    ): Promise<NostrSignedEvent> => {
       await new Promise((resolve) => setTimeout(resolve, 200));
       const res = await callHandler("keychat-nostr", "signEvent", event);
       let parsed: unknown = res;
@@ -38,8 +47,12 @@ export function initializeKeychatShim(): void {
           parsed = res;
         }
       }
-      if (parsed && typeof parsed === "object") {
-        return parsed;
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        "sig" in (parsed as Record<string, unknown>)
+      ) {
+        return parsed as NostrSignedEvent;
       }
       throw new Error("Failed to sign event");
     };
@@ -80,13 +93,14 @@ export function initializeKeychatShim(): void {
     };
 
     // Queue sign requests to avoid concurrent in-app signer prompts.
-    w.nostr.signEvent = (event: Record<string, unknown>) =>
-      new Promise((resolve, reject) => {
+    const queuedSignEvent: NostrSignEvent = (event) =>
+      new Promise<NostrSignedEvent>((resolve, reject) => {
         queue.push({ event, resolve, reject });
         processQueue();
       });
+    nostr.signEvent = queuedSignEvent;
 
-    w.nostr.__ghostrShim = true;
+    nostr.__ghostrShim = true;
     return true;
   };
 
