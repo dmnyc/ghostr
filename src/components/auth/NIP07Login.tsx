@@ -130,11 +130,19 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
         const start = now();
         pubkey = await withTimeout(nostr.getPublicKey(), 10000, "getPublicKey");
         const durationMs = Math.round(now() - start);
-        lines.push({
-          label: "getPublicKey",
-          value: `ok (${durationMs}ms) ${pubkey.slice(0, 8)}...`,
-          status: "ok",
-        });
+        if (!pubkey) {
+          lines.push({
+            label: "getPublicKey",
+            value: `returned null/empty (${durationMs}ms)`,
+            status: "error",
+          });
+        } else {
+          lines.push({
+            label: "getPublicKey",
+            value: `ok (${durationMs}ms) ${pubkey.slice(0, 8)}...`,
+            status: "ok",
+          });
+        }
       } catch (diagError) {
         lines.push({
           label: "getPublicKey",

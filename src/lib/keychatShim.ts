@@ -12,7 +12,9 @@
 export function initializeKeychatShim(): void {
   if (typeof window === "undefined") return;
   const w = window as typeof window & {
-    flutter_inappwebview?: unknown;
+    flutter_inappwebview?: {
+      callHandler?: (name: string, ...args: unknown[]) => Promise<unknown>;
+    };
   };
 
   const applyShim = () => {
@@ -25,6 +27,10 @@ export function initializeKeychatShim(): void {
     if (nostr.__ghostrShim) return true;
 
     console.log("[KeychatShim] Applying shim for Flutter WebView");
+    console.log(
+      "[KeychatShim] callHandler available:",
+      !!w.flutter_inappwebview?.callHandler,
+    );
 
     type NostrSignEvent = NonNullable<
       NonNullable<typeof window.nostr>["signEvent"]

@@ -234,7 +234,9 @@ export async function createWindowNostrSigner(
     "NIP-07 getPublicKey",
   );
   if (!pubkey) {
-    throw new Error("User rejected access");
+    throw new Error(
+      "Signer returned empty pubkey. Please approve the connection request in your signer app.",
+    );
   }
   return new WindowNostrSigner(pubkey);
 }
