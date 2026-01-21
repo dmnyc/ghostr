@@ -184,11 +184,19 @@ export async function loadDraftsNIP37(): Promise<LoadDraftsResult> {
   const drafts: Draft[] = [];
   const deletedIds = new Set<string>();
 
-  for (const event of events) {
-    // Only process Ghostr drafts (check for client tag)
+  // Filter to only Ghostr drafts first
+  const ghostrEvents = Array.from(events).filter((event) => {
     const clientTag = event.tags.find((t) => t[0] === "client");
-    if (!clientTag || clientTag[1] !== "ghostr") continue;
+    return clientTag && clientTag[1] === "ghostr";
+  });
+  console.log(
+    "[NIP-37] Found",
+    ghostrEvents.length,
+    "Ghostr drafts to process",
+  );
 
+  let decryptCount = 0;
+  for (const event of ghostrEvents) {
     // Get draft ID from d-tag
     const dTag = event.tags.find((t) => t[0] === "d");
     if (!dTag || !dTag[1]) continue;
@@ -204,11 +212,20 @@ export async function loadDraftsNIP37(): Promise<LoadDraftsResult> {
 
     try {
       // Decrypt content (NIP-44 encrypted to self)
+      decryptCount++;
+      console.log(
+        `[NIP-37] Decrypting draft ${decryptCount}/${ghostrEvents.length}: ${draftId.slice(0, 8)}...`,
+      );
       const decrypted = await signer.decrypt(user, event.content, "nip44");
       const payload = JSON.parse(decrypted) as DraftPayload;
       drafts.push(payloadToDraft(draftId, payload));
-    } catch {
+      console.log(`[NIP-37] Decrypted draft ${decryptCount} successfully`);
+    } catch (err) {
       // Skip drafts that fail to decrypt (may be from other clients)
+      console.warn(
+        `[NIP-37] Failed to decrypt draft ${draftId.slice(0, 8)}:`,
+        err,
+      );
     }
   }
 

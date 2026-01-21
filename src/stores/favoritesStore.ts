@@ -59,7 +59,7 @@ export const useFavoritesStore = create<FavoritesStore>()((set, get) => ({
       }
 
       // Decrypt content (NIP-44 encrypted to self)
-      const decrypted = await signer.decrypt(user, event.content)
+      const decrypted = await signer.decrypt(user, event.content, 'nip44')
       const favorites = JSON.parse(decrypted) as FavoriteProfile[]
 
       set({ favorites, isLoading: false, isLoaded: true })
@@ -81,7 +81,7 @@ export const useFavoritesStore = create<FavoritesStore>()((set, get) => ({
     const content = JSON.stringify(favorites)
 
     // Encrypt to self
-    const encrypted = await signer.encrypt(user, content)
+    const encrypted = await signer.encrypt(user, content, 'nip44')
 
     const event = new NDKEvent(ndk)
     event.kind = DRAFT_KIND

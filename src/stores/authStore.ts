@@ -49,6 +49,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   loginWithNIP07: async () => {
     if (get().isLoading) {
+      console.log("[Auth] loginWithNIP07 skipped - already loading");
       return;
     }
     set({ isLoading: true, error: null });
@@ -56,11 +57,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const inApp = isInAppWebView();
       const timeoutMs = inApp ? 15000 : 0;
-      console.log("[Auth] Creating NIP-07 signer...");
+      console.log(
+        "[Auth] Creating NIP-07 signer... inApp:",
+        inApp,
+        "timeoutMs:",
+        timeoutMs,
+      );
+      console.log("[Auth] window.nostr available:", !!window.nostr);
+      console.log(
+        "[Auth] window.nostr.nip44 available:",
+        !!window.nostr?.nip44,
+      );
       // Wait for extension when user explicitly clicks login (mobile signers inject late)
       const signer = inApp
         ? await createWindowNostrSigner(timeoutMs || 10000)
         : await withTimeout(createNIP07Signer(true), timeoutMs, "NIP-07 init");
+      console.log("[Auth] Signer created successfully");
       const wrappedSigner = applySignerTimeouts(signer, {
         enabled: inApp,
         timeoutMs,

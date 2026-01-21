@@ -52,7 +52,7 @@ async function encryptGhostNote(
   const recipient = new NDKUser({ pubkey: recipientPubkey });
 
   // Add timeout to prevent hanging on signers that fail silently
-  const encryptPromise = signer.encrypt(recipient, content);
+  const encryptPromise = signer.encrypt(recipient, content, "nip44");
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(
       () =>
@@ -79,7 +79,7 @@ async function decryptGhostNote(
   const sender = new NDKUser({ pubkey: senderPubkey });
 
   // Add timeout to prevent hanging on signers that fail silently
-  const decryptPromise = signer.decrypt(sender, encryptedContent);
+  const decryptPromise = signer.decrypt(sender, encryptedContent, "nip44");
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(
       () =>

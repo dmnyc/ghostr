@@ -35,7 +35,7 @@ export async function loadDraftsFromRelay(): Promise<Draft[]> {
 
   try {
     // Decrypt content (NIP-44 encrypted to self)
-    const decrypted = await signer.decrypt(user, event.content)
+    const decrypted = await signer.decrypt(user, event.content, 'nip44')
     const drafts = JSON.parse(decrypted) as Draft[]
     return drafts
   } catch (error) {
@@ -55,7 +55,7 @@ export async function saveDraftsToRelay(drafts: Draft[]): Promise<void> {
   const content = JSON.stringify(drafts)
 
   // Encrypt to self
-  const encrypted = await signer.encrypt(user, content)
+  const encrypted = await signer.encrypt(user, content, 'nip44')
 
   const event = new NDKEvent(ndk)
   event.kind = DRAFT_KIND
@@ -132,7 +132,7 @@ export async function loadPublishHistoryFromRelay(): Promise<PublishedItem[]> {
   }
 
   try {
-    const decrypted = await signer.decrypt(user, event.content)
+    const decrypted = await signer.decrypt(user, event.content, 'nip44')
     const storedItems = JSON.parse(decrypted) as StoredHistoryItem[]
     return storedItems.map(fromStoredItem)
   } catch (error) {
@@ -155,7 +155,7 @@ export async function savePublishHistoryToRelay(items: PublishedItem[]): Promise
     .map(toStoredItem)
 
   const content = JSON.stringify(storedItems)
-  const encrypted = await signer.encrypt(user, content)
+  const encrypted = await signer.encrypt(user, content, 'nip44')
 
   const event = new NDKEvent(ndk)
   event.kind = DRAFT_KIND
@@ -187,7 +187,7 @@ export async function loadProcessedSubmissionsFromRelay(): Promise<string[]> {
   }
 
   try {
-    const decrypted = await signer.decrypt(user, event.content)
+    const decrypted = await signer.decrypt(user, event.content, 'nip44')
     return JSON.parse(decrypted) as string[]
   } catch {
     return []
@@ -203,7 +203,7 @@ export async function saveProcessedSubmissionsToRelay(ids: string[]): Promise<vo
   }
 
   const content = JSON.stringify(ids)
-  const encrypted = await signer.encrypt(user, content)
+  const encrypted = await signer.encrypt(user, content, 'nip44')
 
   const event = new NDKEvent(ndk)
   event.kind = DRAFT_KIND
@@ -235,7 +235,7 @@ export async function loadArchivedSubmissionsFromRelay(): Promise<string[]> {
   }
 
   try {
-    const decrypted = await signer.decrypt(user, event.content)
+    const decrypted = await signer.decrypt(user, event.content, 'nip44')
     return JSON.parse(decrypted) as string[]
   } catch {
     return []
@@ -251,7 +251,7 @@ export async function saveArchivedSubmissionsToRelay(ids: string[]): Promise<voi
   }
 
   const content = JSON.stringify(ids)
-  const encrypted = await signer.encrypt(user, content)
+  const encrypted = await signer.encrypt(user, content, 'nip44')
 
   const event = new NDKEvent(ndk)
   event.kind = DRAFT_KIND
@@ -292,7 +292,7 @@ export async function loadEditedSubmissionsFromRelay(): Promise<Record<string, E
   }
 
   try {
-    const decrypted = await signer.decrypt(user, event.content)
+    const decrypted = await signer.decrypt(user, event.content, 'nip44')
     const edits = JSON.parse(decrypted) as EditedSubmissionData[]
     // Convert array to map keyed by submission ID
     return Object.fromEntries(edits.map((edit) => [edit.id, edit]))
@@ -312,7 +312,7 @@ export async function saveEditedSubmissionsToRelay(edits: Record<string, EditedS
   // Convert map to array for storage
   const editsArray = Object.values(edits)
   const content = JSON.stringify(editsArray)
-  const encrypted = await signer.encrypt(user, content)
+  const encrypted = await signer.encrypt(user, content, 'nip44')
 
   const event = new NDKEvent(ndk)
   event.kind = DRAFT_KIND

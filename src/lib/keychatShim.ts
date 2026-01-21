@@ -1,65 +1,51 @@
+/**
+ * Keychat Shim - Serializes NIP-07 operations in Flutter WebView
+ *
+ * Problem: Keychat's in-app browser can only handle one signing prompt at a time.
+ * If multiple decrypt/sign operations are triggered concurrently, the UI freezes.
+ *
+ * Solution: Queue all NIP-07 operations and process them serially.
+ * We use window.nostr methods directly (not callHandler) since window.nostr
+ * is the standard NIP-07 interface that Keychat implements.
+ */
+
 export function initializeKeychatShim(): void {
   if (typeof window === "undefined") return;
   const w = window as typeof window & {
-    flutter_inappwebview?: {
-      callHandler?: (name: string, ...args: unknown[]) => Promise<unknown>;
-    };
+    flutter_inappwebview?: unknown;
   };
 
   const applyShim = () => {
     const nostr =
       (w.nostr as typeof window.nostr & { __ghostrShim?: boolean }) ??
       undefined;
-    if (!w.flutter_inappwebview?.callHandler || !nostr) return false;
+
+    // Only apply shim if we're in a Flutter WebView and have window.nostr
+    if (!w.flutter_inappwebview || !nostr) return false;
     if (nostr.__ghostrShim) return true;
 
-    const callHandler = w.flutter_inappwebview.callHandler.bind(
-      w.flutter_inappwebview,
-    );
-
-    const withTimeout = async <T>(
-      promise: Promise<T>,
-      timeoutMs: number,
-      label: string,
-    ): Promise<T> => {
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      });
-
-      return Promise.race([promise, timeoutPromise]).finally(() => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      }) as Promise<T>;
-    };
+    console.log("[KeychatShim] Applying shim for Flutter WebView");
 
     type NostrSignEvent = NonNullable<
       NonNullable<typeof window.nostr>["signEvent"]
     >;
-    type NostrEventParam = Parameters<NostrSignEvent>[0];
-    type NostrSignedEvent = Awaited<ReturnType<NostrSignEvent>>;
     type Nip04 = NonNullable<NonNullable<typeof window.nostr>["nip04"]>;
     type Nip44 = NonNullable<NonNullable<typeof window.nostr>["nip44"]>;
 
-    let signing = false;
-    const queueDelayMs = 200;
-    const handlerTimeoutMs = 15000;
+    // Queue system to serialize all NIP-07 operations
+    let processing = false;
+    const queueDelayMs = 100; // Small delay between operations to let UI breathe
     const queue: {
+      label: string;
       run: () => Promise<unknown>;
       resolve: (value: unknown) => void;
       reject: (reason?: unknown) => void;
     }[] = [];
 
-    const originalSignEvent = nostr.signEvent?.bind(nostr) as
-      | NostrSignEvent
-      | undefined;
-
-    const enqueue = <T>(run: () => Promise<T>): Promise<T> =>
+    const enqueue = <T>(label: string, run: () => Promise<T>): Promise<T> =>
       new Promise<T>((resolve, reject) => {
         queue.push({
+          label,
           run: run as () => Promise<unknown>,
           resolve: resolve as (value: unknown) => void,
           reject,
@@ -67,163 +53,77 @@ export function initializeKeychatShim(): void {
         processQueue();
       });
 
-    const signWithHandler = async (
-      event: NostrEventParam,
-    ): Promise<NostrSignedEvent> => {
-      await new Promise((resolve) => setTimeout(resolve, queueDelayMs));
-      const res = await withTimeout(
-        callHandler("keychat-nostr", "signEvent", event),
-        handlerTimeoutMs,
-        "keychat signEvent",
-      );
-      let parsed: unknown = res;
-      if (typeof res === "string") {
-        try {
-          parsed = JSON.parse(res);
-        } catch {
-          parsed = res;
-        }
-      }
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        "sig" in (parsed as Record<string, unknown>)
-      ) {
-        return parsed as NostrSignedEvent;
-      }
-      throw new Error("Failed to sign event");
-    };
-
     const processQueue = async () => {
-      if (signing || queue.length === 0) return;
-      signing = true;
+      if (processing || queue.length === 0) return;
+      processing = true;
+
       const item = queue.shift();
       if (!item) {
-        signing = false;
+        processing = false;
         return;
       }
 
+      // Small delay to prevent UI blocking
+      await new Promise((resolve) => setTimeout(resolve, queueDelayMs));
+
       try {
-        const signed = await item.run();
-        item.resolve(signed);
+        console.log(`[KeychatShim] Processing: ${item.label}`);
+        const result = await item.run();
+        item.resolve(result);
       } catch (error) {
+        console.warn(`[KeychatShim] Failed: ${item.label}`, error);
         item.reject(error instanceof Error ? error : new Error(String(error)));
       }
 
-      signing = false;
+      processing = false;
+      // Process next item in queue
       processQueue();
     };
 
-    // Queue sign requests to avoid concurrent in-app signer prompts.
-    const queuedSignEvent: NostrSignEvent = (event) =>
-      enqueue(async () => {
-        try {
-          return await signWithHandler(event);
-        } catch (error) {
-          if (!originalSignEvent) {
-            throw error;
-          }
-          return originalSignEvent(event);
-        }
-      });
-    nostr.signEvent = queuedSignEvent;
+    // Wrap signEvent to serialize signing requests
+    const originalSignEvent = nostr.signEvent?.bind(nostr) as
+      | NostrSignEvent
+      | undefined;
+    if (originalSignEvent) {
+      nostr.signEvent = (event) =>
+        enqueue("signEvent", () => originalSignEvent(event));
+    }
 
+    // Wrap NIP-04 encrypt/decrypt
     const nip04 = nostr.nip04;
     if (nip04?.encrypt) {
-      const originalEncrypt = nip04.encrypt.bind(nip04) as
-        | Nip04["encrypt"]
-        | undefined;
+      const originalEncrypt = nip04.encrypt.bind(nip04) as Nip04["encrypt"];
       nip04.encrypt = (pubkey, plaintext) =>
-        enqueue(async () => {
-          try {
-            const res = await withTimeout(
-              callHandler("keychat-nostr", "nip04Encrypt", pubkey, plaintext),
-              handlerTimeoutMs,
-              "keychat nip04 encrypt",
-            );
-            return typeof res === "string" ? res : String(res ?? "");
-          } catch (error) {
-            if (!originalEncrypt) {
-              throw error;
-            }
-            return originalEncrypt(pubkey, plaintext);
-          }
-        });
+        enqueue("nip04.encrypt", () => originalEncrypt(pubkey, plaintext));
     }
-
     if (nip04?.decrypt) {
-      const originalDecrypt = nip04.decrypt.bind(nip04) as
-        | Nip04["decrypt"]
-        | undefined;
+      const originalDecrypt = nip04.decrypt.bind(nip04) as Nip04["decrypt"];
       nip04.decrypt = (pubkey, ciphertext) =>
-        enqueue(async () => {
-          try {
-            const res = await withTimeout(
-              callHandler("keychat-nostr", "nip04Decrypt", pubkey, ciphertext),
-              handlerTimeoutMs,
-              "keychat nip04 decrypt",
-            );
-            return typeof res === "string" ? res : String(res ?? "");
-          } catch (error) {
-            if (!originalDecrypt) {
-              throw error;
-            }
-            return originalDecrypt(pubkey, ciphertext);
-          }
-        });
+        enqueue("nip04.decrypt", () => originalDecrypt(pubkey, ciphertext));
     }
 
+    // Wrap NIP-44 encrypt/decrypt
     const nip44 = nostr.nip44;
     if (nip44?.encrypt) {
-      const originalEncrypt = nip44.encrypt.bind(nip44) as
-        | Nip44["encrypt"]
-        | undefined;
+      const originalEncrypt = nip44.encrypt.bind(nip44) as Nip44["encrypt"];
       nip44.encrypt = (pubkey, plaintext) =>
-        enqueue(async () => {
-          try {
-            const res = await withTimeout(
-              callHandler("keychat-nostr", "nip44Encrypt", pubkey, plaintext),
-              handlerTimeoutMs,
-              "keychat nip44 encrypt",
-            );
-            return typeof res === "string" ? res : String(res ?? "");
-          } catch (error) {
-            if (!originalEncrypt) {
-              throw error;
-            }
-            return originalEncrypt(pubkey, plaintext);
-          }
-        });
+        enqueue("nip44.encrypt", () => originalEncrypt(pubkey, plaintext));
     }
-
     if (nip44?.decrypt) {
-      const originalDecrypt = nip44.decrypt.bind(nip44) as
-        | Nip44["decrypt"]
-        | undefined;
+      const originalDecrypt = nip44.decrypt.bind(nip44) as Nip44["decrypt"];
       nip44.decrypt = (pubkey, ciphertext) =>
-        enqueue(async () => {
-          try {
-            const res = await withTimeout(
-              callHandler("keychat-nostr", "nip44Decrypt", pubkey, ciphertext),
-              handlerTimeoutMs,
-              "keychat nip44 decrypt",
-            );
-            return typeof res === "string" ? res : String(res ?? "");
-          } catch (error) {
-            if (!originalDecrypt) {
-              throw error;
-            }
-            return originalDecrypt(pubkey, ciphertext);
-          }
-        });
+        enqueue("nip44.decrypt", () => originalDecrypt(pubkey, ciphertext));
     }
 
     nostr.__ghostrShim = true;
+    console.log("[KeychatShim] Shim applied successfully");
     return true;
   };
 
+  // Try to apply immediately
   if (applyShim()) return;
 
+  // Poll for window.nostr (Keychat may inject it after page load)
   const start = Date.now();
   const pollIntervalMs = 250;
   const timeoutMs = 10000;
@@ -233,6 +133,7 @@ export function initializeKeychatShim(): void {
     }
   }, pollIntervalMs);
 
+  // Also listen for Flutter ready event
   window.addEventListener?.("flutterInAppWebViewPlatformReady", () => {
     applyShim();
   });

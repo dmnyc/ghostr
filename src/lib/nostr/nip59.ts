@@ -45,7 +45,11 @@ export async function sendGiftWrappedSubmission(
   };
 
   // Create seal (kind 13) - encrypt rumor to recipient
-  const sealContent = await signer.encrypt(recipient, JSON.stringify(rumor));
+  const sealContent = await signer.encrypt(
+    recipient,
+    JSON.stringify(rumor),
+    "nip44",
+  );
 
   const seal = new NDKEvent(ndk);
   seal.kind = SEAL_KIND;
@@ -60,6 +64,7 @@ export async function sendGiftWrappedSubmission(
   const wrapContent = await ephemeralSigner.encrypt(
     recipient,
     JSON.stringify(seal.rawEvent()),
+    "nip44",
   );
 
   const wrap = new NDKEvent(ndk);
@@ -101,7 +106,11 @@ export async function sendGiftWrappedReceipt(
   };
 
   // Create seal (kind 13)
-  const sealContent = await signer.encrypt(recipient, JSON.stringify(rumor));
+  const sealContent = await signer.encrypt(
+    recipient,
+    JSON.stringify(rumor),
+    "nip44",
+  );
 
   const seal = new NDKEvent(ndk);
   seal.kind = SEAL_KIND;
@@ -116,6 +125,7 @@ export async function sendGiftWrappedReceipt(
   const wrapContent = await ephemeralSigner.encrypt(
     recipient,
     JSON.stringify(seal.rawEvent()),
+    "nip44",
   );
 
   const wrap = new NDKEvent(ndk);
@@ -149,7 +159,7 @@ async function decryptWithTimeout(
   content: string,
   timeoutMs: number = 15000,
 ): Promise<string> {
-  const decryptPromise = signer.decrypt(sender, content);
+  const decryptPromise = signer.decrypt(sender, content, "nip44");
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("Decryption timed out")), timeoutMs),
   );
