@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/ghost-notes", "destination": "/ghost-notes.html" },
+    { "source": "/ghost-notes/:tab", "destination": "/ghost-notes.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
