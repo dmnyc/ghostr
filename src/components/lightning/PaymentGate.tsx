@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { Zap, Copy, Check, ExternalLink, Loader2 } from "lucide-react";
+import { Zap, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { storePaymentProof, hasPaymentProof } from "@/lib/lightning/paymentVerifier";
