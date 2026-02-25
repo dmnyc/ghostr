@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Lock, Eye, Clock, Loader2, Copy, Check, AlertCircle, Zap } from 'lucide-react'
+import { Lock, Eye, Clock, Loader2, Copy, Check, AlertCircle } from 'lucide-react'
 import { GhostNoteIcon } from '@/components/common/GhostNoteIcon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -115,7 +115,7 @@ export function GhostNoteViewer() {
       const bolt11Tag = event.tags.find((t: string[]) => t[0] === 'bolt11')
       const paymentHashTag = event.tags.find((t: string[]) => t[0] === 'payment_hash')
 
-      const priceSats = priceTag ? parseInt(priceTag[1]) : undefined
+      const priceSats = priceTag ? parseInt(priceTag[1] || '') : undefined
       const bolt11 = bolt11Tag?.[1]
       const paymentHash = paymentHashTag?.[1]
 
