@@ -182,7 +182,7 @@ export async function listPayments(limit: number = 20): Promise<Payment[]> {
     10000,
     "List payments",
   );
-  return response.payments;
+  return (response as any).payments;
 }
 
 /**
