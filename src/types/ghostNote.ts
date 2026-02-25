@@ -23,6 +23,11 @@ export interface GhostNote {
   relayUrls: string[]
   notificationEnabled: boolean
   metadata?: Record<string, unknown>
+
+  // Lightning payment fields (optional — only for paid Ghost Notes)
+  priceSats?: number
+  bolt11?: string
+  paymentHash?: string
 }
 
 export interface GhostNoteCreateInput {
@@ -30,6 +35,7 @@ export interface GhostNoteCreateInput {
   content: string
   expirationSeconds: number
   notifyOnRead: boolean
+  priceSats?: number // Optional Lightning payment required to unlock
 }
 
 export interface GhostNoteResult {

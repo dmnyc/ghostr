@@ -103,7 +103,8 @@ function validateGhostNoteInput(input: GhostNoteCreateInput): void {
   if (!input.content || input.content.trim().length === 0) {
     throw new Error(GHOST_NOTE_ERRORS.CONTENT_EMPTY);
   }
-  if (input.content.length > 500) {
+  // Paid notes have no character limit; free notes capped at 500
+  if (!input.priceSats && input.content.length > 500) {
     throw new Error(GHOST_NOTE_ERRORS.CONTENT_TOO_LONG);
   }
 
@@ -157,13 +158,35 @@ export async function createGhostNote(
     event.kind = GHOST_NOTE_KIND;
     event.content = encryptedContent;
     event.created_at = now;
-    event.tags = [
+    const tags = [
       ["d", dTag],
       ["p", input.recipientPubkey],
       ["expiration", expiration.toString()],
       ["client", "ghostr"],
       ["t", "ghost-note"],
     ];
+
+    // Add Lightning payment tags for paid Ghost Notes
+    let bolt11: string | undefined;
+    let paymentHash: string | undefined;
+
+    if (input.priceSats && input.priceSats > 0) {
+      tags.push(["price", input.priceSats.toString()]);
+      try {
+        const { createGhostNoteInvoice } = await import("@/lib/lightning/invoiceGenerator");
+        const invoice = await createGhostNoteInvoice(input.priceSats, dTag);
+        bolt11 = invoice.bolt11;
+        paymentHash = invoice.paymentHash;
+        tags.push(["bolt11", invoice.bolt11]);
+        tags.push(["payment_hash", invoice.paymentHash]);
+      } catch (err) {
+        console.warn("[GhostNote] Could not generate invoice, publishing without:", err);
+        // Still publish the note with price tag but without invoice
+        // Sender can generate invoice later
+      }
+    }
+
+    event.tags = tags;
 
     // Sign and publish
     await event.sign(signer);
@@ -192,6 +215,9 @@ export async function createGhostNote(
       revokedAt: null,
       relayUrls: [...connectedRelays],
       notificationEnabled: input.notifyOnRead,
+      priceSats: input.priceSats,
+      bolt11,
+      paymentHash,
     };
 
     const link = generateGhostNoteURL(dTag);
