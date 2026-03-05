@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { NIP07Login } from './NIP07Login'
+import { BunkerLogin } from './BunkerLogin'
 import { NSECLogin } from './NSECLogin'
 
 interface LoginDialogProps {
@@ -26,13 +27,18 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         </DialogHeader>
 
         <Tabs defaultValue="extension" className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="extension">Extension</TabsTrigger>
+            <TabsTrigger value="bunker">Bunker</TabsTrigger>
             <TabsTrigger value="nsec">Private Key</TabsTrigger>
           </TabsList>
 
           <TabsContent value="extension" className="mt-4">
             <NIP07Login onSuccess={() => onOpenChange(false)} />
+          </TabsContent>
+
+          <TabsContent value="bunker" className="mt-4">
+            <BunkerLogin onSuccess={() => onOpenChange(false)} />
           </TabsContent>
 
           <TabsContent value="nsec" className="mt-4">

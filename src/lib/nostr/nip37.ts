@@ -212,11 +212,16 @@ export async function loadDraftsNIP37(): Promise<LoadDraftsResult> {
 
     try {
       // Decrypt content (NIP-44 encrypted to self)
+      // Timeout prevents hanging with NIP-46 signers when relays are slow
       decryptCount++;
       console.log(
         `[NIP-37] Decrypting draft ${decryptCount}/${ghostrEvents.length}: ${draftId.slice(0, 8)}...`,
       );
-      const decrypted = await signer.decrypt(user, event.content, "nip44");
+      const decryptPromise = signer.decrypt(user, event.content, "nip44");
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Draft decrypt timed out")), 15000),
+      );
+      const decrypted = await Promise.race([decryptPromise, timeoutPromise]);
       const payload = JSON.parse(decrypted) as DraftPayload;
       drafts.push(payloadToDraft(draftId, payload));
       console.log(`[NIP-37] Decrypted draft ${decryptCount} successfully`);
@@ -315,7 +320,11 @@ export async function loadLegacyDrafts(): Promise<Draft[]> {
   }
 
   try {
-    const decrypted = await signer.decrypt(user, event.content);
+    const decryptPromise = signer.decrypt(user, event.content);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Legacy draft decrypt timed out")), 15000),
+    );
+    const decrypted = await Promise.race([decryptPromise, timeoutPromise]);
     const drafts = JSON.parse(decrypted) as Draft[];
     return drafts;
   } catch {
@@ -522,7 +531,11 @@ export async function loadPublisherDraftsNIP37(): Promise<LoadPublisherDraftsRes
 
     try {
       // Decrypt content (NIP-44 encrypted to self)
-      const decrypted = await signer.decrypt(user, event.content, "nip44");
+      const pubDecryptPromise = signer.decrypt(user, event.content, "nip44");
+      const pubTimeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Publisher draft decrypt timed out")), 15000),
+      );
+      const decrypted = await Promise.race([pubDecryptPromise, pubTimeoutPromise]);
       const payload = JSON.parse(decrypted) as PublisherDraftPayload;
       drafts.push(payloadToPublisherDraft(draftId, payload));
     } catch {
