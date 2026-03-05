@@ -203,8 +203,19 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">
         <p>
-          Login using your browser extension (Alby, nos2x, or similar). This is
-          the recommended and most secure method.
+          Login using a browser extension like{" "}
+          <a
+            href="https://getalby.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Alby
+          </a>
+          . This is the recommended and most secure method.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground/70">
+          Note: Keys.band is not compatible due to lack of NIP-44 support.
         </p>
       </div>
 
