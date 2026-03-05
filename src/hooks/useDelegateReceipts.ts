@@ -8,9 +8,37 @@ import type { ReceiptPayload } from "@/types/receipt";
 import { toast } from "@/hooks/useToast";
 
 const GIFT_WRAP_KIND = 1059;
+const MAX_CONCURRENT_UNWRAPS = 3;
 
 // Track processed event IDs to prevent duplicate processing across re-mounts
 const processedEventIds = new Set<string>();
+
+// Concurrency-limited queue for unwrapping gift wraps.
+// NIP-46 signers require relay round-trips for each decrypt, so unlimited
+// parallel unwraps flood the bunker and hang the app.
+let activeUnwraps = 0;
+const unwrapQueue: (() => void)[] = [];
+
+function enqueueUnwrap<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const run = () => {
+      activeUnwraps++;
+      fn()
+        .then(resolve, reject)
+        .finally(() => {
+          activeUnwraps--;
+          const next = unwrapQueue.shift();
+          if (next) next();
+        });
+    };
+
+    if (activeUnwraps < MAX_CONCURRENT_UNWRAPS) {
+      run();
+    } else {
+      unwrapQueue.push(run);
+    }
+  });
+}
 
 // Queue of pending receipts to retry when drafts load
 interface PendingReceipt {
@@ -142,12 +170,14 @@ export function useDelegateReceipts() {
             event.id,
           );
 
-          // Wrap unwrap in a timeout to prevent blocking on slow signers
-          const unwrapPromise = unwrapGiftWrappedMessage(event);
-          const timeoutPromise = new Promise<null>((resolve) =>
-            setTimeout(() => resolve(null), 10000),
-          );
-          const unwrapped = await Promise.race([unwrapPromise, timeoutPromise]);
+          // Queue unwrap with concurrency limit to prevent flooding NIP-46 signers
+          const unwrapped = await enqueueUnwrap(() => {
+            const unwrapPromise = unwrapGiftWrappedMessage(event);
+            const timeoutPromise = new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 15000),
+            );
+            return Promise.race([unwrapPromise, timeoutPromise]);
+          });
 
           if (!unwrapped) {
             console.log("[DelegateReceipts] Failed to unwrap message");

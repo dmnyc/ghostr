@@ -7,13 +7,14 @@ import { useSubmissionStore } from "./submissionStore";
 import {
   applySignerTimeouts,
   createNIP07Signer,
+  createNIP46BunkerSigner,
   createNSECSigner,
   createWindowNostrSigner,
   isInAppWebView,
   withTimeout,
 } from "@/lib/ndk/signers";
 
-type SignerType = "nip07" | "nsec" | null;
+type SignerType = "nip07" | "nsec" | "nip46" | null;
 
 interface UserProfile {
   name?: string;
@@ -33,6 +34,7 @@ interface AuthStore {
 
   loginWithNIP07: () => Promise<void>;
   loginWithNSEC: (nsec: string) => Promise<void>;
+  loginWithBunker: (bunkerUri: string) => Promise<void>;
   logout: () => void;
   fetchProfile: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -163,6 +165,66 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  loginWithBunker: async (bunkerUri: string) => {
+    if (get().isLoading) {
+      console.log("[Auth] loginWithBunker skipped - already loading");
+      return;
+    }
+    set({ isLoading: true, error: null });
+
+    try {
+      const { ndk } = useNDKStore.getState();
+      if (!ndk) {
+        throw new Error("NDK not initialized. Please try again.");
+      }
+
+      const savedLocalKey =
+        localStorage.getItem("ghostr-nip46-local-key") || undefined;
+
+      const { signer, localKeyHex } = await createNIP46BunkerSigner(
+        ndk,
+        bunkerUri,
+        savedLocalKey,
+      );
+
+      const user = await signer.user();
+      console.log("[Auth] NIP-46 user pubkey:", user.pubkey.slice(0, 8) + "...");
+
+      ndk.signer = signer;
+
+      set({
+        isAuthenticated: true,
+        user,
+        signer,
+        signerType: "nip46",
+        isLoading: false,
+      });
+
+      localStorage.setItem("ghostr-auth-type", "nip46");
+      localStorage.setItem("ghostr-nip46-bunker-uri", bunkerUri);
+      localStorage.setItem("ghostr-nip46-local-key", localKeyHex);
+
+      get()
+        .fetchProfile()
+        .catch(() => {});
+      useNDKStore
+        .getState()
+        .fetchNIP65Relays(user.pubkey)
+        .catch(() => {});
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to connect to bunker";
+      set({
+        isLoading: false,
+        error: message.includes("timed out")
+          ? "Bunker connection timed out. Make sure your bunker is online and you approved the request."
+          : `Bunker connection failed: ${message}`,
+      });
+    }
+  },
+
   logout: () => {
     const { ndk } = useNDKStore.getState();
     if (ndk) {
@@ -171,6 +233,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     // Clear saved session and role
     localStorage.removeItem("ghostr-auth-type");
+    localStorage.removeItem("ghostr-nip46-bunker-uri");
+    localStorage.removeItem("ghostr-nip46-local-key");
     sessionStorage.removeItem("ghostr-active-role");
 
     // Clear user-specific stores
@@ -194,19 +258,36 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       return;
     }
 
-    // Only restore NIP-07 sessions (NSEC should not be persisted for security)
     if (savedAuthType === "nip07") {
       console.log("[Auth] Attempting to restore NIP-07 session...");
       try {
         await get().loginWithNIP07();
         console.log("[Auth] Session restored successfully");
       } catch (error) {
-        // Clear invalid session
         console.warn(
           "[Auth] Failed to restore session:",
           error instanceof Error ? error.message : error,
         );
         localStorage.removeItem("ghostr-auth-type");
+      }
+    } else if (savedAuthType === "nip46") {
+      const bunkerUri = localStorage.getItem("ghostr-nip46-bunker-uri");
+      if (!bunkerUri) {
+        localStorage.removeItem("ghostr-auth-type");
+        return;
+      }
+      console.log("[Auth] Attempting to restore NIP-46 session...");
+      try {
+        await get().loginWithBunker(bunkerUri);
+        console.log("[Auth] NIP-46 session restored successfully");
+      } catch (error) {
+        console.warn(
+          "[Auth] Failed to restore NIP-46 session:",
+          error instanceof Error ? error.message : error,
+        );
+        localStorage.removeItem("ghostr-auth-type");
+        localStorage.removeItem("ghostr-nip46-bunker-uri");
+        localStorage.removeItem("ghostr-nip46-local-key");
       }
     }
   },

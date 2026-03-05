@@ -1,8 +1,10 @@
 import type NDK from "@nostr-dev-kit/ndk";
 import {
   NDKNip07Signer,
+  NDKNip46Signer,
   NDKPrivateKeySigner,
   NDKRelay,
+  NDKRelayAuthPolicies,
   NDKUser,
   type NDKEncryptionScheme,
   type NDKSigner,
@@ -319,6 +321,39 @@ export function createNSECSigner(nsec: string): NDKPrivateKeySigner {
   }
 
   return new NDKPrivateKeySigner(privateKey);
+}
+
+/**
+ * Create a NIP-46 bunker signer from a bunker:// URI.
+ * Returns the ready signer and the local ephemeral key hex for persistence.
+ */
+export async function createNIP46BunkerSigner(
+  ndk: NDK,
+  bunkerUri: string,
+  localSignerKey?: string,
+  timeoutMs: number = 60000,
+): Promise<{ signer: NDKNip46Signer; localKeyHex: string }> {
+  if (!bunkerUri.startsWith("bunker://")) {
+    throw new Error("Invalid bunker URI. Must start with bunker://");
+  }
+
+  const localSigner = localSignerKey
+    ? new NDKPrivateKeySigner(hexToBytes(localSignerKey))
+    : NDKPrivateKeySigner.generate();
+
+  const nip46Signer = NDKNip46Signer.bunker(ndk, bunkerUri, localSigner);
+
+  await withTimeout(
+    nip46Signer.blockUntilReady(),
+    timeoutMs,
+    "NIP-46 bunker connection",
+  );
+
+  ndk.relayAuthDefaultPolicy = NDKRelayAuthPolicies.signIn({ ndk });
+
+  const localKeyHex = nip46Signer.localSigner.privateKey!;
+
+  return { signer: nip46Signer, localKeyHex };
 }
 
 function hexToBytes(hex: string): Uint8Array {
