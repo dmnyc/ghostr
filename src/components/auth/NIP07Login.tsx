@@ -252,7 +252,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
           <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="text-sm">
             Your extension doesn't support NIP-44, which Ghostr requires.
-            Try Alby or nos2x instead, or use the Private Key tab.
+            Try Alby or nos2x, connect via Bunker (Amber), or use the Private Key tab.
           </p>
         </div>
       )}
