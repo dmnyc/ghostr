@@ -251,8 +251,8 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
         <div className="flex items-start gap-2 rounded-md bg-orange-500/10 p-3 text-orange-600 dark:text-orange-500">
           <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="text-sm">
-            Your extension lacks NIP-44 support. Ghost Notes and encrypted
-            features will not work.
+            Your extension doesn't support NIP-44, which Ghostr requires.
+            Try Alby or nos2x instead, or use the Private Key tab.
           </p>
         </div>
       )}
@@ -266,7 +266,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
 
       <Button
         onClick={handleLogin}
-        disabled={isLoading || isDiagnosing || !hasExtension}
+        disabled={isLoading || isDiagnosing || !hasExtension || !hasNip44}
         className="w-full"
       >
         <KeyRound className="mr-2 h-4 w-4" />
