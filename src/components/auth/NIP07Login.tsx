@@ -102,7 +102,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
     } else {
       try {
         const start = now();
-        pubkey = await withTimeout(nostr.getPublicKey(), 10000, "getPublicKey");
+        pubkey = await withTimeout(nostr.getPublicKey(), 5000, "getPublicKey");
         const durationMs = Math.round(now() - start);
         if (!pubkey) {
           lines.push({
@@ -135,12 +135,12 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
         const start = now();
         const encrypted = await withTimeout(
           nostr.nip44!.encrypt!(pubkey, payload),
-          10000,
+          5000,
           "nip44.encrypt",
         );
         const decrypted = await withTimeout(
           nostr.nip44!.decrypt!(pubkey, encrypted),
-          10000,
+          5000,
           "nip44.decrypt",
         );
         const durationMs = Math.round(now() - start);
@@ -266,7 +266,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
 
       <Button
         onClick={handleLogin}
-        disabled={isLoading || !hasExtension}
+        disabled={isLoading || isDiagnosing || !hasExtension}
         className="w-full"
       >
         <KeyRound className="mr-2 h-4 w-4" />
@@ -280,7 +280,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
             variant="outline"
             size="sm"
             onClick={runDiagnostics}
-            disabled={isDiagnosing}
+            disabled={isDiagnosing || isLoading}
             className="w-full text-muted-foreground"
           >
             {isDiagnosing
