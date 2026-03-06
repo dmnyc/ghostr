@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     try {
       const inApp = isInAppWebView();
-      const timeoutMs = inApp ? 15000 : 0;
+      const timeoutMs = inApp ? 15000 : 10000;
       console.log(
         "[Auth] Creating NIP-07 signer... inApp:",
         inApp,
