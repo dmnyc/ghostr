@@ -499,7 +499,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   }
 
   const isSubmittedOrPublished =
-    draft.status === "submitted" || draft.status === "published";
+    draft.status === "submitted" || draft.status === "published" || draft.status === "retracted";
   const isPublished = draft.status === "published";
 
   return (

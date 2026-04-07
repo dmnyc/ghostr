@@ -72,7 +72,14 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
   }
 
   const handleUnarchive = async () => {
-    updateDraft(draft.id, { archived: false })
+    const updates: Partial<Draft> = { archived: false }
+    // Reset retracted drafts back to editable state
+    if (draft.status === 'retracted') {
+      updates.status = 'draft'
+      updates.submittedTo = undefined
+      updates.lastSubmissionId = undefined
+    }
+    updateDraft(draft.id, updates)
     await saveDraft(draft.id)
     toast({
       title: 'Draft restored',
@@ -103,7 +110,7 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
               {draft.title || (draft.targetKind === 1 ? 'Short Note Draft' : 'Untitled Draft')}
             </h3>
           </div>
-          {!isArchived && <StatusBadge status={draft.status} />}
+          <StatusBadge status={draft.status} />
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Kind {draft.targetKind === 1 ? '1 (Note)' : '30023 (Article)'}</span>
