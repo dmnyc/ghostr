@@ -1,4 +1,4 @@
-import { FileText, Trash2, Archive, RotateCcw } from 'lucide-react'
+import { FileText, Trash2, Archive, RotateCcw, Undo2 } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
@@ -23,8 +23,10 @@ interface DraftCardProps {
 }
 
 export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
-  const { setCurrentDraft, deleteDraft, archiveDraft, updateDraft, saveDraft } = useDraftStore()
+  const { setCurrentDraft, deleteDraft, archiveDraft, retractSubmission, updateDraft, saveDraft } = useDraftStore()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showRetractDialog, setShowRetractDialog] = useState(false)
+  const [isRetracting, setIsRetracting] = useState(false)
 
   const handleView = () => {
     setCurrentDraft(draft.id)
@@ -37,6 +39,26 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
       title: 'Draft deleted',
       description: 'Your draft has been permanently deleted.',
     })
+  }
+
+  const handleRetract = async () => {
+    setShowRetractDialog(false)
+    setIsRetracting(true)
+    try {
+      await retractSubmission(draft.id)
+      toast({
+        title: 'Submission retracted',
+        description: 'Your submission has been withdrawn. You can edit and resubmit.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Retraction failed',
+        description: error instanceof Error ? error.message : 'Failed to retract submission.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsRetracting(false)
+    }
   }
 
   const handleArchive = async () => {
@@ -136,14 +158,25 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
               </>
             )}
             {isSubmitted && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleArchive}
-                title="Archive submission"
-              >
-                <Archive className="h-4 w-4" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRetractDialog(true)}
+                  disabled={isRetracting}
+                  title="Retract submission"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleArchive}
+                  title="Archive submission"
+                >
+                  <Archive className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </>
         )}
@@ -161,6 +194,23 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
               Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRetractDialog} onOpenChange={setShowRetractDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retract submission?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will withdraw your submission from the publisher's inbox. Your draft will return to editable state so you can modify and resubmit it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRetract}>
+              Retract submission
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

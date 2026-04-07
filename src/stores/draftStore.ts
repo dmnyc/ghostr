@@ -7,6 +7,10 @@ import {
   deleteDraftNIP37,
 } from "@/lib/nostr/nip37";
 import { isInAppWebView, withTimeout } from "@/lib/ndk/signers";
+import { sendGiftWrappedRetraction } from "@/lib/nostr/nip59";
+import { npubToPubkey } from "@/stores/authStore";
+import { PROTOCOL_VERSION } from "@/lib/constants";
+import type { RetractionPayload } from "@/types/submission";
 
 const DRAFTS_CACHE_KEY = "ghostr-drafts-cache";
 
@@ -143,6 +147,7 @@ interface DraftStore {
   markAsRejected: (id: string, reason?: string) => void;
   dismissRejection: (id: string) => void;
   dismissAllRejections: () => void;
+  retractSubmission: (id: string) => Promise<void>;
   archiveDraft: (id: string) => Promise<void>;
   clearDrafts: () => void;
 }
@@ -448,6 +453,52 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
 
   dismissAllRejections: () => {
     set({ unseenRejectionIds: new Set() });
+  },
+
+  retractSubmission: async (id) => {
+    const { drafts } = get();
+    const draft = drafts.find((d) => d.id === id);
+    if (!draft || draft.status !== "submitted" || !draft.submittedTo || !draft.lastSubmissionId) {
+      throw new Error("Draft is not in a retractable state");
+    }
+
+    // Send retraction to the publisher
+    const recipientPubkey = npubToPubkey(draft.submittedTo);
+    const retraction: RetractionPayload = {
+      protocol: PROTOCOL_VERSION as 'ghostr_v1',
+      type: "retraction",
+      submissionId: draft.lastSubmissionId,
+      retractedAt: Math.floor(Date.now() / 1000),
+    };
+
+    await sendGiftWrappedRetraction(recipientPubkey, retraction);
+
+    // Reset draft back to editable state
+    set((state) => {
+      const newDrafts = state.drafts.map((d) =>
+        d.id === id
+          ? {
+              ...d,
+              status: "draft" as const,
+              submittedTo: undefined,
+              lastSubmissionId: undefined,
+              updatedAt: Date.now(),
+            }
+          : d,
+      );
+      saveDraftsToCache(newDrafts);
+      return { drafts: newDrafts };
+    });
+
+    // Persist to relay
+    const updatedDraft = get().drafts.find((d) => d.id === id);
+    if (updatedDraft) {
+      try {
+        await saveDraftNIP37(updatedDraft);
+      } catch (error) {
+        console.error("[DraftStore] Failed to save retracted draft to relay:", error);
+      }
+    }
   },
 
   archiveDraft: async (id) => {

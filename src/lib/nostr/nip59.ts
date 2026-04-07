@@ -5,7 +5,7 @@ import {
   type NDKSigner,
 } from "@nostr-dev-kit/ndk";
 import { generateSecretKey } from "nostr-tools";
-import type { SubmissionPayload, Submission } from "@/types/submission";
+import type { SubmissionPayload, RetractionPayload, Submission } from "@/types/submission";
 import type { ReceiptPayload } from "@/types/receipt";
 import { PROTOCOL_VERSION } from "@/lib/constants";
 import { useNDKStore } from "@/stores/ndkStore";
@@ -144,9 +144,70 @@ export async function sendGiftWrappedReceipt(
   await Promise.race([publishPromise, timeoutPromise]);
 }
 
+export async function sendGiftWrappedRetraction(
+  recipientPubkey: string,
+  retraction: RetractionPayload,
+): Promise<void> {
+  const { ndk } = useNDKStore.getState();
+  const { user, signer } = useAuthStore.getState();
+
+  if (!ndk || !user || !signer) {
+    throw new Error("Not connected or authenticated");
+  }
+
+  const recipient = new NDKUser({ pubkey: recipientPubkey });
+
+  // Create the rumor (unsigned kind 14 DM)
+  const rumor = {
+    kind: DM_KIND,
+    content: JSON.stringify(retraction),
+    tags: [["p", recipientPubkey]],
+    created_at: randomizeTimestamp(),
+    pubkey: user.pubkey,
+  };
+
+  // Create seal (kind 13)
+  const sealContent = await signer.encrypt(
+    recipient,
+    JSON.stringify(rumor),
+    "nip44",
+  );
+
+  const seal = new NDKEvent(ndk);
+  seal.kind = SEAL_KIND;
+  seal.content = sealContent;
+  seal.created_at = randomizeTimestamp();
+  await seal.sign(signer);
+
+  // Create gift wrap (kind 1059) with ephemeral key
+  const ephemeralKey = generateSecretKey();
+  const ephemeralSigner = new NDKPrivateKeySigner(ephemeralKey);
+
+  const wrapContent = await ephemeralSigner.encrypt(
+    recipient,
+    JSON.stringify(seal.rawEvent()),
+    "nip44",
+  );
+
+  const wrap = new NDKEvent(ndk);
+  wrap.kind = GIFT_WRAP_KIND;
+  wrap.content = wrapContent;
+  wrap.tags = [["p", recipientPubkey]];
+  wrap.created_at = randomizeTimestamp();
+
+  await wrap.sign(ephemeralSigner);
+
+  // Race publish against a timeout - don't wait forever for slow relays
+  const publishPromise = wrap.publish();
+  const timeoutPromise = new Promise<void>((resolve) =>
+    setTimeout(resolve, 3000),
+  );
+  await Promise.race([publishPromise, timeoutPromise]);
+}
+
 export interface UnwrappedMessage {
   senderPubkey: string;
-  payload: SubmissionPayload | ReceiptPayload;
+  payload: SubmissionPayload | ReceiptPayload | RetractionPayload;
   createdAt: number; // Unix timestamp from the rumor
 }
 

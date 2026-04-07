@@ -9,6 +9,13 @@ export interface SubmissionPayload {
   submittedAt?: number // Unix timestamp in seconds when submitted (added for accurate timestamps)
 }
 
+export interface RetractionPayload {
+  protocol: 'ghostr_v1'
+  type: 'retraction'
+  submissionId: string
+  retractedAt: number // Unix timestamp in seconds
+}
+
 export interface Submission {
   id: string
   delegateNpub: string

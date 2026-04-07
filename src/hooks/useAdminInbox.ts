@@ -7,14 +7,14 @@ import {
   unwrapGiftWrappedMessage,
   submissionFromPayload,
 } from "@/lib/nostr/nip59";
-import type { SubmissionPayload } from "@/types/submission";
+import type { SubmissionPayload, RetractionPayload } from "@/types/submission";
 
 const GIFT_WRAP_KIND = 1059;
 
 export function useAdminInbox(idsReady: boolean = true) {
   const { ndk } = useNDKStore();
   const { user, isAuthenticated } = useAuthStore();
-  const { addSubmission, isProcessed, setLoading, archivedIds } =
+  const { addSubmission, removeSubmission, markAsProcessed, isProcessed, setLoading, archivedIds } =
     useSubmissionStore();
   const subscriptionRef = useRef<NDKSubscription | null>(null);
 
@@ -53,6 +53,14 @@ export function useAdminInbox(idsReady: boolean = true) {
           const unwrapped = await Promise.race([unwrapPromise, timeoutPromise]);
 
           if (!unwrapped) {
+            return;
+          }
+
+          // Handle retractions - delegate is withdrawing a submission
+          if (unwrapped.payload.type === "retraction") {
+            const retraction = unwrapped.payload as RetractionPayload;
+            removeSubmission(retraction.submissionId);
+            markAsProcessed(retraction.submissionId);
             return;
           }
 
@@ -102,6 +110,8 @@ export function useAdminInbox(idsReady: boolean = true) {
     isAuthenticated,
     idsReady,
     addSubmission,
+    removeSubmission,
+    markAsProcessed,
     isProcessed,
     archivedIds,
     setLoading,
