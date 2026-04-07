@@ -79,7 +79,8 @@ function mergeDrafts(
       // that the relay version doesn't have yet
       const localHasStatusChange =
         (localDraft.status === "rejected" ||
-          localDraft.status === "published") &&
+          localDraft.status === "published" ||
+          localDraft.status === "retracted") &&
         (relayDraft.status === "submitted" || relayDraft.status === "draft");
 
       if (localHasStatusChange) {
@@ -473,15 +474,14 @@ export const useDraftStore = create<DraftStore>((set, get) => ({
 
     await sendGiftWrappedRetraction(recipientPubkey, retraction);
 
-    // Reset draft back to editable state
+    // Mark as retracted and auto-archive
     set((state) => {
       const newDrafts = state.drafts.map((d) =>
         d.id === id
           ? {
               ...d,
-              status: "draft" as const,
-              submittedTo: undefined,
-              lastSubmissionId: undefined,
+              status: "retracted" as const,
+              archived: true,
               updatedAt: Date.now(),
             }
           : d,

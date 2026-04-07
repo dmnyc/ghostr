@@ -18,6 +18,8 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       return <Badge variant="success">Published</Badge>
     case 'rejected':
       return <Badge variant="destructive">Rejected</Badge>
+    case 'retracted':
+      return <Badge variant="outline">Retracted</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
   }

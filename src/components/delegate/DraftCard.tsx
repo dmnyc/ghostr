@@ -48,7 +48,7 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
       await retractSubmission(draft.id)
       toast({
         title: 'Submission retracted',
-        description: 'Your submission has been withdrawn. You can edit and resubmit.',
+        description: 'Your submission has been withdrawn and archived.',
       })
     } catch (error) {
       toast({
@@ -204,7 +204,7 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Retract submission?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will withdraw your submission from the publisher's inbox. Your draft will return to editable state so you can modify and resubmit it.
+              This will withdraw your submission from the publisher's inbox. The draft will be marked as retracted and archived.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

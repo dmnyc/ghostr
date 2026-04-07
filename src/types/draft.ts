@@ -14,7 +14,7 @@ export interface Draft {
   summary?: string // Optional summary for kind 30023 articles (NIP-23)
   targetKind: 1 | 30023
   tags: string[][]
-  status: 'draft' | 'submitted' | 'published' | 'rejected'
+  status: 'draft' | 'submitted' | 'published' | 'rejected' | 'retracted'
   updatedAt: number
   targetPublisher?: DraftPublisher
   submittedTo?: string
