@@ -25,7 +25,7 @@ interface DraftPayload {
   content: string;
   targetKind: 1 | 30023;
   tags: string[][];
-  status: "draft" | "submitted" | "published" | "rejected";
+  status: "draft" | "submitted" | "published" | "rejected" | "retracted";
   updatedAt: number;
   targetPublisher?: Draft["targetPublisher"];
   submittedTo?: string;
