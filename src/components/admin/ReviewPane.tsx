@@ -524,6 +524,15 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               </p>
             </div>
 
+            {submission.note && (
+              <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">Delegate note:</span>
+                <p className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
+                  {submission.note}
+                </p>
+              </div>
+            )}
+
           </div>
 
           {submission.tags.length > 0 && (

@@ -54,6 +54,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [threadPosts, setThreadPosts] = useState<string[]>([''])
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishingPostIndex, setPublishingPostIndex] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
   const [attachedImages, setAttachedImages] = useState<string[]>([])
@@ -344,11 +345,15 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
     }
 
     setIsPublishing(true)
+    setPublishingPostIndex(null)
+    let threadPublishedIds: string[] = []
+    let threadPostCount = 0
 
     try {
       const cleanThreadPosts = isThread && !isLongForm
         ? threadPosts.map((post) => post.trim()).filter(Boolean)
         : []
+      threadPostCount = cleanThreadPosts.length
 
       if (!isLongForm && isThread) {
         if (cleanThreadPosts.length < 2) {
@@ -361,8 +366,10 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         }
 
         const publishedIds: string[] = []
+        threadPublishedIds = publishedIds
         let publisherPubkey: string | undefined
         for (const [index, postContent] of cleanThreadPosts.entries()) {
+          setPublishingPostIndex(index)
           let postFinalContent = postContent
           if (index === cleanThreadPosts.length - 1 && attachedImages.length > 0) {
             const newImages = attachedImages.filter(url => !postFinalContent.includes(url))
@@ -531,13 +538,18 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       onBack()
     } catch (err) {
       console.error('Failed to publish:', err)
+      const baseMessage = err instanceof Error ? err.message : 'An error occurred'
+      const description = threadPostCount > 0 && threadPublishedIds.length > 0 && threadPublishedIds.length < threadPostCount
+        ? `${threadPublishedIds.length} of ${threadPostCount} posts went live before the error — posts 1 through ${threadPublishedIds.length} are already published. ${baseMessage}`
+        : baseMessage
       toast({
         title: 'Failed to publish',
-        description: err instanceof Error ? err.message : 'An error occurred',
+        description,
         variant: 'destructive',
       })
     } finally {
       setIsPublishing(false)
+      setPublishingPostIndex(null)
     }
   }
 
@@ -631,7 +643,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
+            {isPublishing
+              ? (!isLongForm && isThread && publishingPostIndex !== null
+                ? `Publishing post ${publishingPostIndex + 1} of ${threadPosts.map((post) => post.trim()).filter(Boolean).length}…`
+                : 'Publishing...')
+              : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
           </Button>
         </div>
       </div>
