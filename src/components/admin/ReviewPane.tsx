@@ -22,6 +22,7 @@ import { extractImageUrls } from "@/lib/blossom";
 import { extractLinkUrls, type LinkMetadata } from "@/lib/urlUtils";
 import { useProfileQuery } from "@/hooks/queries/useProfileQuery";
 import { toast } from "@/hooks/useToast";
+import { hasThreadMarker, joinThreadPosts, splitThreadPosts } from "@/lib/threadUtils";
 
 interface ReviewPaneProps {
   onBack: () => void;
@@ -54,18 +55,14 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
   const [editedSummary, setEditedSummary] = useState(savedEdits?.summary || summaryTag?.[1] || "");
   const [editedContent, setEditedContent] = useState(savedEdits?.content || submission?.content || "");
   const [editedCoverImage, setEditedCoverImage] = useState(savedEdits?.coverImage || coverImageTag?.[1] || "");
-  const isThreadSubmission = submission?.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true') ?? false;
-  const splitThreadContent = (value: string) =>
-    value.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean);
-  const joinThreadPosts = (posts: string[]) =>
-    posts.map((post) => post.trim()).filter(Boolean).join("\n---\n");
+  const isThreadSubmission = hasThreadMarker(submission?.tags ?? []);
   const getInitialThreadPosts = () => {
     if (!isThreadSubmission) return [];
-    const savedPosts = splitThreadContent(savedEdits?.content || "");
+    const savedPosts = splitThreadPosts(savedEdits?.content || "");
     if (savedPosts.length > 0) return savedPosts;
     const payloadPosts = submission?.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? [];
     if (payloadPosts.length > 0) return payloadPosts;
-    return splitThreadContent(submission?.content || "");
+    return splitThreadPosts(submission?.content || "");
   };
   const [editedThreadPosts, setEditedThreadPosts] = useState<string[]>(getInitialThreadPosts);
   const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -270,7 +267,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge status={submission.status} />
               <span className="text-sm text-muted-foreground">
-                {submission.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')
+                {hasThreadMarker(submission.tags)
                   ? 'Thread'
                   : submission.kind === 1 ? "1 (Note)" : "30023 (Article)"}
               </span>
@@ -394,10 +391,6 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
                       disabled={isProcessed}
                       minHeight="120px"
                     />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{post.length}/280 characters</span>
-                      {post.length > 280 && <span className="text-destructive">Over 280 characters</span>}
-                    </div>
                   </div>
                 ))}
                 {!isProcessed && (
@@ -448,14 +441,9 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               </>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              {isThreadSubmission
-                ? `${editedThreadPosts.length} posts · ${editedContent.length} total characters`
-                : `${editedContent.length} characters`}
-              {editedContent !== submission.content && " (modified)"}
-              {submission.kind === 1 && !isThreadSubmission && attachedImages.length > 0 &&
-                ` | ${attachedImages.length} image${attachedImages.length !== 1 ? "s" : ""}`}
-            </p>
+            {editedContent !== submission.content && (
+              <p className="text-xs text-muted-foreground">Modified</p>
+            )}
           </div>
 
           {/* Image Re-hosting Options for submissions with images */}
@@ -536,16 +524,6 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               </p>
             </div>
 
-            {submission.note && (
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">
-                  Note from delegate:
-                </span>
-                <p className="text-sm bg-muted p-2 rounded">
-                  {submission.note}
-                </p>
-              </div>
-            )}
           </div>
 
           {submission.tags.length > 0 && (

@@ -23,6 +23,7 @@ import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
 import { sendBotNotification } from '@/lib/nostr/nip04'
 import { createApprovalNotification } from '@/lib/notifications/messageTemplates'
+import { hasThreadMarker, splitThreadPosts, stripThreadMarker } from '@/lib/threadUtils'
 
 interface PublishDialogProps {
   open: boolean
@@ -54,18 +55,15 @@ export function PublishDialog({
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
+  const [publishingPostIndex, setPublishingPostIndex] = useState<number | null>(null)
 
-  const splitThreadPosts = (value: string) =>
-    value.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
-  const hasThreadTag = submission.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')
+  const hasThreadTag = hasThreadMarker(submission.tags)
   const payloadThreadPosts = submission.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? []
   const contentThreadPosts = splitThreadPosts(editedContent)
   const isThreadSubmission = submission.kind === 1 && (hasThreadTag || payloadThreadPosts.length > 1 || contentThreadPosts.length > 1)
   const dialogThreadPosts = isThreadSubmission
     ? (contentThreadPosts.length > 1 ? contentThreadPosts : payloadThreadPosts)
     : []
-  const overLimitCount = dialogThreadPosts.filter((post) => post.length > 280).length
-
   const handlePublish = async () => {
     if (!ndk || !signer) {
       setError('Not connected or authenticated')
@@ -80,14 +78,14 @@ export function PublishDialog({
 
     setIsPublishing(true)
     setError(null)
+    setPublishingPostIndex(null)
+    let threadPublishedIds: string[] = []
+    let threadPostCount = 0
 
     try {
       const isThread = isThreadSubmission
-      const editedThreadPosts = isThread
-        ? (editedContent.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean).length > 1
-          ? editedContent.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
-          : (submission.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? []))
-        : []
+      const editedThreadPosts = isThread ? dialogThreadPosts : []
+      threadPostCount = editedThreadPosts.length
 
       if (isThread && submission.kind === 1) {
         if (editedThreadPosts.length < 2) {
@@ -96,12 +94,14 @@ export function PublishDialog({
           return
         }
         const publishedIds: string[] = []
+        threadPublishedIds = publishedIds
         let publisherPubkey: string | undefined
         for (const [index, postContent] of editedThreadPosts.entries()) {
+          setPublishingPostIndex(index)
           const threadEvent = new NDKEvent(ndk)
           threadEvent.kind = 1
           threadEvent.content = postContent
-          const tags: string[][] = submission.tags.filter((t) => t[0] !== 'ghostr-thread')
+          const tags: string[][] = stripThreadMarker(submission.tags)
           if (includeCredit) {
             tags.push(['client', 'Ghostr'])
           }
@@ -280,9 +280,15 @@ export function PublishDialog({
       onSuccess()
     } catch (err) {
       console.error('Failed to publish:', err)
-      setError(err instanceof Error ? err.message : 'Failed to publish')
+      const baseMessage = err instanceof Error ? err.message : 'Failed to publish'
+      if (threadPostCount > 0 && threadPublishedIds.length > 0 && threadPublishedIds.length < threadPostCount) {
+        setError(`${threadPublishedIds.length} of ${threadPostCount} posts went live before the error — posts 1 through ${threadPublishedIds.length} are already published. ${baseMessage}`)
+      } else {
+        setError(baseMessage)
+      }
     } finally {
       setIsPublishing(false)
+      setPublishingPostIndex(null)
     }
   }
 
@@ -307,24 +313,15 @@ export function PublishDialog({
                 {isThreadSubmission ? `${dialogThreadPosts.length} thread posts` : submission.kind}
               </div>
               <div>
-                <span className="text-muted-foreground">Content length:</span>{' '}
-                {editedContent.length} characters
-              </div>
-              <div>
                 <span className="text-muted-foreground">Tags:</span>{' '}
-                {submission.tags.filter((tag) => tag[0] !== 'ghostr-thread').length} public tag(s)
+                {stripThreadMarker(submission.tags).length} public tag(s)
               </div>
             </div>
             {isThreadSubmission && (
               <div className="space-y-2 max-h-64 overflow-auto pr-1">
                 {dialogThreadPosts.map((post, index) => (
                   <div key={index} className="rounded-md border bg-background p-3 text-xs space-y-1">
-                    <div className="flex items-center justify-between font-medium">
-                      <span>Post {index + 1}</span>
-                      <span className={post.length > 280 ? 'text-destructive' : 'text-muted-foreground'}>
-                        {post.length}/280
-                      </span>
-                    </div>
+                    <div className="font-medium">Post {index + 1}</div>
                     <p className="whitespace-pre-wrap text-muted-foreground line-clamp-3">{post}</p>
                   </div>
                 ))}
@@ -338,15 +335,6 @@ export function PublishDialog({
               submission has been approved and published.
             </p>
           </div>
-
-          {isThreadSubmission && overLimitCount > 0 && (
-            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm">
-                {overLimitCount} post{overLimitCount === 1 ? '' : 's'} exceed 280 characters. They can still publish to Nostr, but may not fit X-style limits.
-              </span>
-            </div>
-          )}
 
           {error && (
             <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-destructive">
@@ -374,7 +362,13 @@ export function PublishDialog({
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}
-              {isPublishing ? 'Publishing...' : isThreadSubmission ? `Publish ${dialogThreadPosts.length} posts` : 'Publish to Nostr'}
+              {isPublishing
+                ? (isThreadSubmission && publishingPostIndex !== null
+                  ? `Publishing post ${publishingPostIndex + 1} of ${dialogThreadPosts.length}…`
+                  : 'Publishing...')
+                : isThreadSubmission
+                  ? `Publish ${dialogThreadPosts.length} posts`
+                  : 'Publish to Nostr'}
             </Button>
           </div>
         </DialogFooter>
