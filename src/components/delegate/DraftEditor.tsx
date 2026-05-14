@@ -12,6 +12,9 @@ import {
   Trash2,
   RefreshCw,
   Plus,
+  MessageSquare,
+  LayoutList,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,13 +85,15 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [lengthWarningDismissed, setLengthWarningDismissed] = useState(false);
   const [threadPosts, setThreadPosts] = useState<string[]>(() => {
     const savedAsThread = draft?.targetKind === 1 && hasThreadMarker(draft?.tags ?? []);
-    if (!savedAsThread) return [draft?.content ?? "", ""];
+    if (!savedAsThread) return [draft?.content ?? ""];
     const existingPosts = splitThreadPosts(draft?.content ?? "");
-    return existingPosts.length > 0 ? existingPosts : ["", ""];
+    return existingPosts.length > 0 ? existingPosts : [""];
   });
   const [isThread, setIsThread] = useState(() =>
     draft?.targetKind === 1 && hasThreadMarker(draft?.tags ?? []),
   );
+  const [splitVersion, setSplitVersion] = useState(0);
+  const [threadPostImages, setThreadPostImages] = useState<string[][]>([[]]);
   const [coverImage, setCoverImage] = useState<string | undefined>(
     draft?.coverImage,
   );
@@ -99,12 +104,26 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [pendingModeChange, setPendingModeChange] = useState<"short" | "long" | null>(null);
   const [lastRelaySave, setLastRelaySave] = useState<number | null>(null);
 
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true);
 
   const threadContent = (posts: string[] = threadPosts) => joinThreadPosts(posts);
+
+  const threadContentWithImages = (
+    posts: string[] = threadPosts,
+    images: string[][] = threadPostImages,
+  ) =>
+    joinThreadPosts(
+      posts.map((post, i) => {
+        const imgs = images[i] ?? [];
+        const text = post.trim();
+        if (imgs.length === 0) return text;
+        return text.length > 0 ? `${text}\n${imgs.join("\n")}` : imgs.join("\n");
+      }),
+    );
 
   const tagsForCurrentMode = () => {
     const baseTags = stripThreadMarker(draft?.tags ?? []);
@@ -257,7 +276,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
     if (currentDraftId && hasChanges) {
       // For kind 1 notes, append images and links at the end
-      let finalContent = (isThread ? threadContent() : debouncedContentLocal).trim();
+      let finalContent = (isThread ? threadContentWithImages() : debouncedContentLocal).trim();
 
       if (!isLongForm && !isThread) {
         if (debouncedImagesLocal.length > 0) {
@@ -371,9 +390,34 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     setHasChanges(true);
   };
 
+  const threadHasMultiplePosts = () =>
+    threadPosts.filter((post, i) => post.trim().length > 0 || (threadPostImages[i]?.length ?? 0) > 0).length > 1;
+
+  const requestKindChange = (toLongForm: boolean) => {
+    if (isThread && threadHasMultiplePosts()) {
+      setPendingModeChange(toLongForm ? "long" : "short");
+      return;
+    }
+    handleKindChange(toLongForm);
+  };
+
+  const confirmPendingModeChange = () => {
+    if (pendingModeChange === null) return;
+    handleKindChange(pendingModeChange === "long");
+    setThreadPosts([""]);
+    setThreadPostImages([[]]);
+    setPendingModeChange(null);
+  };
+
   const handleThreadModeChange = () => {
     if (!isThread) {
-      setThreadPosts(content.trim() ? [content] : ["", ""]);
+      // Only seed threadPosts from content the first time entering thread mode.
+      // Otherwise preserve any structured thread the user already built.
+      const isInitialEmpty = threadPosts.length === 1 && threadPosts[0] === "";
+      if (isInitialEmpty && (content?.trim() || attachedImages.length > 0)) {
+        setThreadPosts([content ?? ""]);
+        setThreadPostImages([attachedImages]);
+      }
     }
     setIsLongForm(false);
     setIsThread(true);
@@ -381,16 +425,56 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   };
 
   const handleThreadPostChange = (index: number, value: string) => {
+    let didSplit = false;
+    let splitCount = 1;
     setThreadPosts((posts) => {
-      const nextPosts = posts.map((post, i) => (i === index ? value : post));
+      let nextPosts: string[];
+      if (/\n\s*-{2,}\s*\n/.test(value)) {
+        const parts = splitThreadPosts(value);
+        if (parts.length > 1) {
+          nextPosts = [...posts];
+          nextPosts.splice(index, 1, ...parts);
+          didSplit = true;
+          splitCount = parts.length;
+        } else {
+          nextPosts = posts.map((post, i) => (i === index ? value : post));
+        }
+      } else {
+        nextPosts = posts.map((post, i) => (i === index ? value : post));
+      }
       setContent(threadContent(nextPosts));
       return nextPosts;
     });
+    if (didSplit) {
+      setThreadPostImages((imgs) => {
+        const next = [...imgs];
+        const existing = next[index] ?? [];
+        const newSlots = Array.from({ length: splitCount }, (_, i) => (i === 0 ? existing : []));
+        next.splice(index, 1, ...newSlots);
+        return next;
+      });
+      setSplitVersion((v) => v + 1);
+    }
     setHasChanges(true);
   };
 
   const handleAddThreadPost = () => {
     setThreadPosts((posts) => [...posts, ""]);
+    setThreadPostImages((imgs) => [...imgs, []]);
+    setHasChanges(true);
+  };
+
+  const handleThreadPostImageUpload = (index: number, url: string) => {
+    setThreadPostImages((imgs) =>
+      imgs.map((postImgs, i) => (i === index ? [...postImgs, url] : postImgs))
+    );
+    setHasChanges(true);
+  };
+
+  const handleRemoveThreadPostImage = (index: number, url: string) => {
+    setThreadPostImages((imgs) =>
+      imgs.map((postImgs, i) => (i === index ? postImgs.filter((u) => u !== url) : postImgs))
+    );
     setHasChanges(true);
   };
 
@@ -400,14 +484,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       setContent(threadContent(nextPosts));
       return nextPosts;
     });
-    setHasChanges(true);
-  };
-
-  const handleSplitThreadPaste = () => {
-    const splitPosts = splitThreadPosts(joinThreadPosts(threadPosts));
-    const nextPosts = splitPosts.length > 0 ? splitPosts : [""];
-    setThreadPosts(nextPosts);
-    setContent(threadContent(nextPosts));
+    setThreadPostImages((imgs) => imgs.filter((_, i) => i !== index));
     setHasChanges(true);
   };
 
@@ -460,7 +537,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     if (!draft) return;
 
     // For kind 1 notes, append images and links at the end
-    let finalContent = (isThread ? threadContent() : content).trim();
+    let finalContent = (isThread ? threadContentWithImages() : content).trim();
 
     if (!isLongForm && !isThread) {
       if (attachedImages.length > 0) {
@@ -491,7 +568,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   };
 
   const handleSubmitForReview = () => {
-    if (!(isThread ? threadContent() : content).trim()) {
+    if (!(isThread ? threadContentWithImages() : content).trim()) {
       toast({
         title: "Cannot submit",
         description: "Please add some content before submitting.",
@@ -499,7 +576,10 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       });
       return;
     }
-    if (isThread && threadPosts.map((post) => post.trim()).filter(Boolean).length < 2) {
+    if (
+      isThread &&
+      threadPosts.filter((post, i) => post.trim().length > 0 || (threadPostImages[i]?.length ?? 0) > 0).length < 2
+    ) {
       toast({
         title: "Cannot submit thread",
         description: "Add at least two non-empty posts before submitting a thread.",
@@ -509,7 +589,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     }
     if (draft) {
       updateDraft(draft.id, {
-        content: (isThread ? threadContent() : content).trim(),
+        content: (isThread ? threadContentWithImages() : content).trim(),
         targetKind: isLongForm ? 30023 : 1,
         tags: tagsForCurrentMode(),
         targetPublisher: selectedPublisher ?? undefined,
@@ -539,7 +619,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     // Save before going back if there are changes
     if (draft && hasChanges) {
       // For kind 1 notes, append images and links at the end
-      let finalContent = (isThread ? threadContent() : content).trim();
+      let finalContent = (isThread ? threadContentWithImages() : content).trim();
 
       if (!isLongForm && !isThread) {
         if (attachedImages.length > 0) {
@@ -741,37 +821,33 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </div>
             {isThread ? (
               <div className="space-y-4">
-                <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-sm text-muted-foreground">
-                  Thread submissions are sent for publisher review as ordered kind 1 posts.
-                  Paste a draft separated by lines containing only <code className="font-mono">---</code>, then split into posts.
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSplitThreadPaste}
-                    disabled={isSubmittedOrPublished}
-                  >
-                    Split on ---
-                  </Button>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p>Each post is sent for publisher review and published as a sequential kind 1 reply.</p>
+                  <p className="italic">Paste a draft with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
                 </div>
                 {threadPosts.map((post, index) => (
-                  <div key={index} className="rounded-2xl border bg-background p-4 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor={`thread-post-${index}`}>Post {index + 1}</Label>
-                      <div className="flex items-center gap-3">
+                  <div key={`${splitVersion}-${index}`} className="space-y-1.5">
+                    <div className="flex items-center justify-between min-h-[1.5rem]">
+                      {threadPosts.length > 1 ? (
+                        <Label htmlFor={`thread-post-${index}`} className="text-xs text-muted-foreground font-medium">
+                          Post {index + 1}
+                        </Label>
+                      ) : <span />}
+                      <div className="flex items-center gap-1">
+                        {!isSubmittedOrPublished && (
+                          <ImageUploadButton onUpload={(url) => handleThreadPostImageUpload(index, url)} />
+                        )}
                         {threadPosts.length > 1 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
                             onClick={() => handleRemoveThreadPost(index)}
                             disabled={isSubmittedOrPublished}
                             title="Remove post"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
@@ -783,22 +859,22 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                       disabled={isSubmittedOrPublished}
                       minHeight="140px"
                     />
+                    <ImageThumbnailGrid
+                      images={threadPostImages[index] ?? []}
+                      onRemove={(url) => handleRemoveThreadPostImage(index, url)}
+                      disabled={isSubmittedOrPublished}
+                    />
                   </div>
                 ))}
-                <div className="flex items-center justify-end gap-3 border-t pt-3">
-                  <div className="h-8 w-8 rounded-full border border-muted-foreground/30" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleAddThreadPost}
-                    disabled={isSubmittedOrPublished}
-                    className="h-8 w-8 rounded-full border-primary/50 text-primary hover:bg-primary/10"
-                    title="Add post"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddThreadPost}
+                  disabled={isSubmittedOrPublished}
+                  className="w-full border-dashed"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add next post
+                </Button>
               </div>
             ) : isLongForm ? (
               <MarkdownEditor
@@ -983,52 +1059,48 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             <h3 className="font-medium">Post Type</h3>
             <div className="flex items-center bg-primary/15 rounded-full p-1">
               <button
-                onClick={() => handleKindChange(false)}
+                onClick={() => requestKindChange(false)}
                 disabled={isSubmittedOrPublished}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   !isLongForm && !isThread
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground',
                   isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                Short Note
-              </button>
-              <button
-                onClick={() => handleKindChange(true)}
-                disabled={isSubmittedOrPublished}
-                className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
-                  isLongForm && !isThread
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                  isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                Long-form
+                <span className="flex items-center gap-2"><MessageSquare className="h-4 w-4 shrink-0" />Short Note</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Most common for social media</p>
               </button>
               <button
                 onClick={handleThreadModeChange}
                 disabled={isSubmittedOrPublished}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   isThread
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground',
                   isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                Thread
+                <span className="flex items-center gap-2"><LayoutList className="h-4 w-4 shrink-0" />Thread</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">A sequence of short notes</p>
+              </button>
+              <button
+                onClick={() => requestKindChange(true)}
+                disabled={isSubmittedOrPublished}
+                className={cn(
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
+                  isLongForm && !isThread
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground',
+                  isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <span className="flex items-center gap-2"><BookOpen className="h-4 w-4 shrink-0" />Long-form</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {isThread
-                ? "Threads submit as multiple kind 1 posts for publisher review and sequential publishing."
-                : isLongForm
-                ? "Long-form articles (NIP-23, kind 30023) support markdown and are best for blog posts and articles."
-                : "Short notes (kind 1) are like tweets - brief updates and thoughts."}
-            </p>
           </div>
 
           {draft.status === "submitted" && !draft.publishedEventId && (
@@ -1078,6 +1150,26 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
               Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingModeChange !== null}
+        onOpenChange={(open) => { if (!open) setPendingModeChange(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard thread?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have multiple posts in this thread. Switching to {pendingModeChange === "long" ? "Long-form" : "Short Note"} will discard the thread structure and you'll lose your posts. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep thread</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingModeChange}>
+              Discard and switch
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

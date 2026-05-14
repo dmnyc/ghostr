@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Send, Loader2, Save, Trash2, RefreshCw, Plus, X } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, Save, Trash2, RefreshCw, Plus, X, MessageSquare, LayoutList, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,6 +55,8 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [lengthWarningDismissed, setLengthWarningDismissed] = useState(false)
   const [isThread, setIsThread] = useState(false)
   const [threadPosts, setThreadPosts] = useState<string[]>([''])
+  const [splitVersion, setSplitVersion] = useState(0)
+  const [threadPostImages, setThreadPostImages] = useState<string[][]>([[]])
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishingPostIndex, setPublishingPostIndex] = useState<number | null>(null)
@@ -64,6 +66,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([])
   const [hasChanges, setHasChanges] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [pendingModeChange, setPendingModeChange] = useState<'short' | 'long' | null>(null)
   const [lastRelaySave, setLastRelaySave] = useState<number | null>(null)
 
   const imageUrls = extractImageUrls(content)
@@ -166,17 +169,97 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const threadContent = (posts: string[] = threadPosts) => joinThreadPosts(posts)
 
   const updateThreadPost = (index: number, value: string) => {
-    setThreadPosts((prev) => prev.map((post, i) => (i === index ? value : post)))
+    let didSplit = false
+    let splitCount = 1
+    setThreadPosts((prev) => {
+      if (/\n\s*-{2,}\s*\n/.test(value)) {
+        const parts = splitThreadPosts(value)
+        if (parts.length > 1) {
+          const next = [...prev]
+          next.splice(index, 1, ...parts)
+          didSplit = true
+          splitCount = parts.length
+          return next
+        }
+      }
+      return prev.map((post, i) => (i === index ? value : post))
+    })
+    if (didSplit) {
+      setThreadPostImages((imgs) => {
+        const next = [...imgs]
+        const existing = next[index] ?? []
+        const newSlots = Array.from({ length: splitCount }, (_, i) => (i === 0 ? existing : []))
+        next.splice(index, 1, ...newSlots)
+        return next
+      })
+      setSplitVersion((v) => v + 1)
+    }
   }
 
-  const addThreadPost = () => setThreadPosts((prev) => [...prev, ''])
+  const addThreadPost = () => {
+    setThreadPosts((prev) => [...prev, ''])
+    setThreadPostImages((imgs) => [...imgs, []])
+  }
+
+  const addImageToThreadPost = (index: number, url: string) => {
+    setThreadPostImages((imgs) =>
+      imgs.map((postImgs, i) => (i === index ? [...postImgs, url] : postImgs))
+    )
+  }
+
+  const removeImageFromThreadPost = (index: number, url: string) => {
+    setThreadPostImages((imgs) =>
+      imgs.map((postImgs, i) => (i === index ? postImgs.filter((u) => u !== url) : postImgs))
+    )
+  }
 
   const removeThreadPost = (index: number) => {
     setThreadPosts((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev)
+    setThreadPostImages((imgs) => imgs.length > 1 ? imgs.filter((_, i) => i !== index) : imgs)
+  }
+
+  const threadHasMultiplePosts = () =>
+    threadPosts.filter((post, i) => post.trim().length > 0 || (threadPostImages[i]?.length ?? 0) > 0).length > 1
+
+  const requestShortNoteMode = () => {
+    if (isThread && threadHasMultiplePosts()) {
+      setPendingModeChange('short')
+      return
+    }
+    setIsLongForm(false)
+    setIsThread(false)
+  }
+
+  const requestLongFormMode = () => {
+    if (isThread && threadHasMultiplePosts()) {
+      setPendingModeChange('long')
+      return
+    }
+    if (isThread) disableThreadMode()
+    setIsLongForm(true)
+  }
+
+  const confirmPendingModeChange = () => {
+    if (pendingModeChange === 'short') {
+      setIsLongForm(false)
+      setIsThread(false)
+    } else if (pendingModeChange === 'long') {
+      disableThreadMode()
+      setIsLongForm(true)
+    }
+    setThreadPosts([''])
+    setThreadPostImages([[]])
+    setPendingModeChange(null)
   }
 
   const enableThreadMode = () => {
-    setThreadPosts(content.trim() ? [content] : [''])
+    // Only seed threadPosts from content the first time entering thread mode.
+    // Otherwise preserve any structured thread the user already built.
+    const isInitialEmpty = threadPosts.length === 1 && threadPosts[0] === ''
+    if (isInitialEmpty && (content.trim() || attachedImages.length > 0)) {
+      setThreadPosts([content])
+      setThreadPostImages([attachedImages])
+    }
     setIsThread(true)
     setIsLongForm(false)
   }
@@ -354,7 +437,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
     try {
       const cleanThreadPosts = isThread && !isLongForm
-        ? threadPosts.map((post) => post.trim()).filter(Boolean)
+        ? threadPosts
+            .map((post, i) => ({ text: post.trim(), images: threadPostImages[i] ?? [] }))
+            .filter((p) => p.text.length > 0 || p.images.length > 0)
         : []
       threadPostCount = cleanThreadPosts.length
 
@@ -362,7 +447,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         if (cleanThreadPosts.length < 2) {
           toast({
             title: 'Cannot publish thread',
-            description: 'Add at least two non-empty posts before publishing a thread.',
+            description: 'Add at least two posts (with text or an image) before publishing a thread.',
             variant: 'destructive',
           })
           return
@@ -371,14 +456,13 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         const publishedIds: string[] = []
         threadPublishedIds = publishedIds
         let publisherPubkey: string | undefined
-        for (const [index, postContent] of cleanThreadPosts.entries()) {
+        for (const [index, p] of cleanThreadPosts.entries()) {
           setPublishingPostIndex(index)
-          let postFinalContent = postContent
-          if (index === cleanThreadPosts.length - 1 && attachedImages.length > 0) {
-            const newImages = attachedImages.filter(url => !postFinalContent.includes(url))
-            if (newImages.length > 0) {
-              postFinalContent += '\n\n' + newImages.join('\n')
-            }
+          let postFinalContent = p.text
+          if (p.images.length > 0) {
+            postFinalContent = postFinalContent.length > 0
+              ? `${postFinalContent}\n${p.images.join('\n')}`
+              : p.images.join('\n')
           }
 
           const threadEvent = new NDKEvent(ndk)
@@ -430,6 +514,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         setSummary('')
         setContent('')
         setThreadPosts([''])
+        setThreadPostImages([[]])
         setIsThread(false)
         setCoverImage(undefined)
         setAttachedImages([])
@@ -686,44 +771,56 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="content" className="font-display">Content</Label>
-              {!isLongForm && <ImageUploadButton onUpload={handleImageUpload} />}
+              {!isLongForm && !isThread && <ImageUploadButton onUpload={handleImageUpload} />}
             </div>
             {!isLongForm && isThread ? (
-              <div className="space-y-3">
-                <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
-                  Publisher thread mode publishes each box as a sequential kind 1 reply. Paste text separated by lines containing only <code className="font-mono">---</code>, then split if needed.
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setThreadPosts(splitThreadPosts(content).length > 0 ? splitThreadPosts(content) : splitThreadPosts(threadContent()))}
-                  >
-                    Split on ---
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={addThreadPost}>
-                    <Plus className="mr-2 h-4 w-4" /> Add post
-                  </Button>
+              <div className="space-y-4">
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p>Each box publishes as a sequential kind 1 reply.</p>
+                  <p className="italic">Paste text with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
                 </div>
                 {threadPosts.map((post, index) => (
-                  <div key={index} className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Post {index + 1}</Label>
-                      {threadPosts.length > 1 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeThreadPost(index)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
+                  <div key={`${splitVersion}-${index}`} className="space-y-1.5">
+                    <div className="flex items-center justify-between min-h-[1.5rem]">
+                      {threadPosts.length > 1 ? (
+                        <Label className="text-xs text-muted-foreground font-medium">Post {index + 1}</Label>
+                      ) : <span />}
+                      <div className="flex items-center gap-1">
+                        <ImageUploadButton onUpload={(url) => addImageToThreadPost(index, url)} />
+                        {threadPosts.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeThreadPost(index)}
+                            title="Remove post"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <MentionPillTextarea
                       value={post}
                       onChange={(value) => updateThreadPost(index, value)}
                       placeholder={`Thread post ${index + 1}`}
-                      minHeight="120px"
+                      minHeight="140px"
+                    />
+                    <ImageThumbnailGrid
+                      images={threadPostImages[index] ?? []}
+                      onRemove={(url) => removeImageFromThreadPost(index, url)}
                     />
                   </div>
                 ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addThreadPost}
+                  className="w-full border-dashed"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add next post
+                </Button>
               </div>
             ) : isLongForm ? (
               <MarkdownEditor
@@ -781,52 +878,42 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             <h3 className="font-medium">Post Type</h3>
             <div className="flex items-center bg-primary/15 rounded-full p-1">
               <button
-                onClick={() => {
-                  setIsLongForm(false)
-                  setIsThread(false)
-                }}
+                onClick={requestShortNoteMode}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
-                  !isLongForm
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
+                  !isLongForm && !isThread
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
                 )}
               >
-                Short Note
+                <span className="flex items-center gap-2"><MessageSquare className="h-4 w-4 shrink-0" />Short Note</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Most common for social media</p>
               </button>
               <button
                 onClick={enableThreadMode}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   !isLongForm && isThread
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
                 )}
               >
-                Thread
+                <span className="flex items-center gap-2"><LayoutList className="h-4 w-4 shrink-0" />Thread</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">A sequence of short notes</p>
               </button>
               <button
-                onClick={() => {
-                  if (isThread) disableThreadMode()
-                  setIsLongForm(true)
-                }}
+                onClick={requestLongFormMode}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   isLongForm
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
                 )}
               >
-                Long-form
+                <span className="flex items-center gap-2"><BookOpen className="h-4 w-4 shrink-0" />Long-form</span>
+                <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {!isLongForm && isThread
-                ? 'Threads publish multiple kind 1 notes with root/reply tags.'
-                : isLongForm
-                ? 'Long-form articles (NIP-23, kind 30023) support markdown and are best for blog posts and articles.'
-                : 'Short notes (kind 1) are like tweets - brief updates and thoughts.'}
-            </p>
             <div className="pt-2 border-t">
               <div className="flex items-center gap-2 text-sm">
                 <Switch
@@ -856,6 +943,26 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Delete draft</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingModeChange !== null}
+        onOpenChange={(open) => { if (!open) setPendingModeChange(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard thread?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have multiple posts in this thread. Switching to {pendingModeChange === 'long' ? 'Long-form' : 'Short Note'} will discard the thread structure and you'll lose your posts. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep thread</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingModeChange}>
+              Discard and switch
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

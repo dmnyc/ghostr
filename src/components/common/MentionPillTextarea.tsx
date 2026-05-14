@@ -622,7 +622,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           style={{
             minHeight,
             wordBreak: 'normal',
-            overflowWrap: 'break-word'
+            overflowWrap: 'anywhere'
           }}
           data-placeholder={placeholder}
         />
