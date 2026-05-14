@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Check, X, User, AlertTriangle, RefreshCw, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, X, User, AlertTriangle, RefreshCw, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +54,20 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
   const [editedSummary, setEditedSummary] = useState(savedEdits?.summary || summaryTag?.[1] || "");
   const [editedContent, setEditedContent] = useState(savedEdits?.content || submission?.content || "");
   const [editedCoverImage, setEditedCoverImage] = useState(savedEdits?.coverImage || coverImageTag?.[1] || "");
+  const isThreadSubmission = submission?.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true') ?? false;
+  const splitThreadContent = (value: string) =>
+    value.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean);
+  const joinThreadPosts = (posts: string[]) =>
+    posts.map((post) => post.trim()).filter(Boolean).join("\n---\n");
+  const getInitialThreadPosts = () => {
+    if (!isThreadSubmission) return [];
+    const savedPosts = splitThreadContent(savedEdits?.content || "");
+    if (savedPosts.length > 0) return savedPosts;
+    const payloadPosts = submission?.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? [];
+    if (payloadPosts.length > 0) return payloadPosts;
+    return splitThreadContent(submission?.content || "");
+  };
+  const [editedThreadPosts, setEditedThreadPosts] = useState<string[]>(getInitialThreadPosts);
   const [isFeedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([]);
   const [lastRelaySaveTime, setLastRelaySaveTime] = useState<number>(0);
@@ -80,6 +94,15 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
     return contentImages.length > 0 || hasCoverImage;
   }, [originalContentRef.current, submission]);
+
+  // Reset local edits when switching between submissions
+  useEffect(() => {
+    setEditedTitle(savedEdits?.title || titleTag?.[1] || "");
+    setEditedSummary(savedEdits?.summary || summaryTag?.[1] || "");
+    setEditedContent(savedEdits?.content || submission?.content || "");
+    setEditedCoverImage(savedEdits?.coverImage || coverImageTag?.[1] || "");
+    setEditedThreadPosts(getInitialThreadPosts());
+  }, [submission?.id]);
 
   // Auto-save edits (debounced, similar to DraftEditor)
   useEffect(() => {
@@ -152,6 +175,34 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
     }
   }, [submission, editedContent, editedTitle, editedSummary, editedCoverImage, updateSubmissionEdits]);
 
+  const updateThreadPost = (index: number, value: string) => {
+    setEditedThreadPosts((posts) => {
+      const nextPosts = posts.map((post, i) => (i === index ? value : post));
+      const nextContent = joinThreadPosts(nextPosts);
+      setEditedContent(nextContent);
+      if (submission) {
+        updateSubmissionContent(submission.id, nextContent);
+      }
+      return nextPosts;
+    });
+  };
+
+  const addThreadPost = () => {
+    setEditedThreadPosts((posts) => [...posts, ""]);
+  };
+
+  const removeThreadPost = (index: number) => {
+    setEditedThreadPosts((posts) => {
+      const nextPosts = posts.filter((_, i) => i !== index);
+      const nextContent = joinThreadPosts(nextPosts);
+      setEditedContent(nextContent);
+      if (submission) {
+        updateSubmissionContent(submission.id, nextContent);
+      }
+      return nextPosts;
+    });
+  };
+
   // Update content and persist to store
   const handleContentChange = (newContent: string) => {
     setEditedContent(newContent);
@@ -219,7 +270,9 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge status={submission.status} />
               <span className="text-sm text-muted-foreground">
-                Kind {submission.kind === 1 ? "1 (Note)" : "30023 (Article)"}
+                {submission.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')
+                  ? 'Thread'
+                  : submission.kind === 1 ? "1 (Note)" : "30023 (Article)"}
               </span>
             </div>
           </div>
@@ -316,7 +369,53 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
               )}
             </div>
 
-            {submission.kind === 30023 ? (
+            {isThreadSubmission ? (
+              <div className="space-y-4">
+                {editedThreadPosts.map((post, index) => (
+                  <div key={index} className="rounded-2xl border bg-background p-4 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Post {index + 1} {!isProcessed && "(Editable)"}</Label>
+                      {!isProcessed && editedThreadPosts.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeThreadPost(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <MentionPillTextarea
+                      value={post}
+                      onChange={(value) => updateThreadPost(index, value)}
+                      placeholder="Thread post text..."
+                      disabled={isProcessed}
+                      minHeight="120px"
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{post.length}/280 characters</span>
+                      {post.length > 280 && <span className="text-destructive">Over 280 characters</span>}
+                    </div>
+                  </div>
+                ))}
+                {!isProcessed && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 rounded-full"
+                      onClick={addThreadPost}
+                      aria-label="Add post"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : submission.kind === 30023 ? (
               // Long-form article - use MarkdownEditor
               <MarkdownEditor
                 value={editedContent}
@@ -350,9 +449,11 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
             )}
 
             <p className="text-xs text-muted-foreground">
-              {editedContent.length} characters
+              {isThreadSubmission
+                ? `${editedThreadPosts.length} posts · ${editedContent.length} total characters`
+                : `${editedContent.length} characters`}
               {editedContent !== submission.content && " (modified)"}
-              {submission.kind === 1 && attachedImages.length > 0 &&
+              {submission.kind === 1 && !isThreadSubmission && attachedImages.length > 0 &&
                 ` | ${attachedImages.length} image${attachedImages.length !== 1 ? "s" : ""}`}
             </p>
           </div>
