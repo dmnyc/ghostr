@@ -49,6 +49,7 @@ import type { DraftPublisher } from "@/types/draft";
 import { extractImageUrls } from "@/lib/blossom";
 import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
 import { cn } from "@/lib/utils/cn";
+import { hasThreadMarker, joinThreadPosts, splitThreadPosts, stripThreadMarker } from "@/lib/threadUtils";
 
 interface DraftEditorProps {
   onBack: () => void;
@@ -78,15 +79,14 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
   const [threadPosts, setThreadPosts] = useState<string[]>(() => {
-    const existingPosts = draft?.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean) ?? [];
+    const savedAsThread = draft?.targetKind === 1 && hasThreadMarker(draft?.tags ?? []);
+    if (!savedAsThread) return [draft?.content ?? "", ""];
+    const existingPosts = splitThreadPosts(draft?.content ?? "");
     return existingPosts.length > 0 ? existingPosts : ["", ""];
   });
-  const [isThread, setIsThread] = useState(() => {
-    const existingPosts = draft?.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean) ?? [];
-    return draft?.targetKind === 1 && (
-      (draft?.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true') ?? false) || existingPosts.length > 1
-    );
-  });
+  const [isThread, setIsThread] = useState(() =>
+    draft?.targetKind === 1 && hasThreadMarker(draft?.tags ?? []),
+  );
   const [coverImage, setCoverImage] = useState<string | undefined>(
     draft?.coverImage,
   );
@@ -102,11 +102,10 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true);
 
-  const threadContent = (posts: string[] = threadPosts) =>
-    posts.map((post) => post.trim()).filter(Boolean).join("\n---\n");
+  const threadContent = (posts: string[] = threadPosts) => joinThreadPosts(posts);
 
   const tagsForCurrentMode = () => {
-    const baseTags = draft?.tags.filter((tag) => tag[0] !== 'ghostr-thread') ?? [];
+    const baseTags = stripThreadMarker(draft?.tags ?? []);
     return isThread ? [...baseTags, ['ghostr-thread', 'true']] : baseTags;
   };
 
@@ -372,11 +371,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   const handleThreadModeChange = () => {
     if (!isThread) {
-      const splitPosts = content
-        .split(/\n\s*---\s*\n/g)
-        .map((post) => post.trim())
-        .filter(Boolean);
-      setThreadPosts(splitPosts.length > 0 ? splitPosts : ["", ""]);
+      setThreadPosts(content.trim() ? [content] : ["", ""]);
     }
     setIsLongForm(false);
     setIsThread(true);
@@ -407,11 +402,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   };
 
   const handleSplitThreadPaste = () => {
-    const splitPosts = threadPosts
-      .join("\n---\n")
-      .split(/\n\s*---\s*\n/g)
-      .map((post) => post.trim())
-      .filter(Boolean);
+    const splitPosts = splitThreadPosts(joinThreadPosts(threadPosts));
     const nextPosts = splitPosts.length > 0 ? splitPosts : [""];
     setThreadPosts(nextPosts);
     setContent(threadContent(nextPosts));
@@ -766,12 +757,6 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                     <div className="flex items-center justify-between">
                       <Label htmlFor={`thread-post-${index}`}>Post {index + 1}</Label>
                       <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "text-xs",
-                          post.length > 280 ? "text-destructive" : "text-muted-foreground"
-                        )}>
-                          {post.length}/280
-                        </span>
                         {threadPosts.length > 1 && (
                           <Button
                             type="button"
@@ -841,15 +826,11 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 />
               </>
             )}
-            <p className="text-xs text-muted-foreground">
-              {isThread
-                ? `${threadPosts.length} post${threadPosts.length !== 1 ? "s" : ""} · ${threadPosts.reduce((sum, post) => sum + post.length, 0)} total characters`
-                : `${content.length} characters`}
-              {hasImages &&
-                !isLongForm &&
-                !isThread &&
-                ` | ${attachedImages.length} image${attachedImages.length !== 1 ? "s" : ""}`}
-            </p>
+            {hasImages && !isLongForm && !isThread && (
+              <p className="text-xs text-muted-foreground">
+                {attachedImages.length} image{attachedImages.length !== 1 ? "s" : ""}
+              </p>
+            )}
           </div>
         </div>
 

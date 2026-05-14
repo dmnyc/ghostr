@@ -20,6 +20,7 @@ import { NDKEvent } from '@nostr-dev-kit/ndk'
 import { extractImageUrls } from '@/lib/blossom'
 import { extractLinkUrls, fetchLinkMetadata, type LinkMetadata } from '@/lib/urlUtils'
 import { cn } from '@/lib/utils/cn'
+import { hasThreadMarker, joinThreadPosts, splitThreadPosts } from '@/lib/threadUtils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,9 +95,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
     setTitle(currentDraft.title)
     setContent(currentDraft.content)
     setIsLongForm(currentDraft.targetKind === 30023)
-    const savedAsThread = currentDraft.targetKind === 1 && currentDraft.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')
-    const savedThreadPosts = currentDraft.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
-    setIsThread(savedAsThread || savedThreadPosts.length > 1)
+    const savedAsThread = currentDraft.targetKind === 1 && hasThreadMarker(currentDraft.tags)
+    const savedThreadPosts = savedAsThread ? splitThreadPosts(currentDraft.content) : []
+    setIsThread(savedAsThread)
     setThreadPosts(savedThreadPosts.length > 0 ? savedThreadPosts : [''])
     setCoverImage(currentDraft.coverImage)
     setAttachedImages(currentDraft.uploadedImages || [])
@@ -158,11 +159,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
     return () => clearTimeout(autoSaveTimeoutRef.current)
   }, [title, content, isLongForm, isThread, threadPosts, coverImage, attachedImages, attachedLinks, currentDraftId, currentDraft, updateDraft])
 
-  const splitThreadPosts = (value: string) =>
-    value.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
-
-  const threadContent = (posts: string[] = threadPosts) =>
-    posts.map((post) => post.trim()).filter(Boolean).join('\n---\n')
+  const threadContent = (posts: string[] = threadPosts) => joinThreadPosts(posts)
 
   const updateThreadPost = (index: number, value: string) => {
     setThreadPosts((prev) => prev.map((post, i) => (i === index ? value : post)))
@@ -175,8 +172,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   }
 
   const enableThreadMode = () => {
-    const posts = splitThreadPosts(content)
-    setThreadPosts(posts.length > 0 ? posts : [content])
+    setThreadPosts(content.trim() ? [content] : [''])
     setIsThread(true)
     setIsLongForm(false)
   }
@@ -716,7 +712,6 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                       placeholder={`Thread post ${index + 1}`}
                       minHeight="120px"
                     />
-                    <p className="text-xs text-muted-foreground">{post.length} characters</p>
                   </div>
                 ))}
               </div>
@@ -748,12 +743,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 />
               </>
             )}
-            <p className="text-xs text-muted-foreground">
-              {!isLongForm && isThread
-                ? `${threadPosts.length} post${threadPosts.length !== 1 ? 's' : ''} · ${threadPosts.reduce((sum, post) => sum + post.length, 0)} total characters`
-                : `${content.length} characters`}
-              {hasImages && !isLongForm && ` | ${attachedImages.length} image${attachedImages.length !== 1 ? 's' : ''}`}
-            </p>
+            {hasImages && !isLongForm && (
+              <p className="text-xs text-muted-foreground">
+                {attachedImages.length} image{attachedImages.length !== 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         </div>
 

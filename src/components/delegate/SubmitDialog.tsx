@@ -27,6 +27,7 @@ import {
   createNewSubmissionNotification,
   createSubmissionReceivedNotification,
 } from '@/lib/notifications/messageTemplates'
+import { hasThreadMarker, splitThreadPosts } from '@/lib/threadUtils'
 
 interface SubmitDialogProps {
   open: boolean
@@ -126,11 +127,11 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
     try {
       // Build tags array, including title, summary, and cover image if present
       const tags = [...draft.tags]
-      const contentPosts = draft.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
+      const contentPosts = splitThreadPosts(draft.content)
       const isThreadSubmission = draft.targetKind === 1 && (
-        tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true') || contentPosts.length > 1
+        hasThreadMarker(tags) || contentPosts.length > 1
       )
-      if (isThreadSubmission && !tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')) {
+      if (isThreadSubmission && !hasThreadMarker(tags)) {
         tags.push(['ghostr-thread', 'true'])
       }
       if (draft.targetKind === 30023) {
