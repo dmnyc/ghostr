@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,16 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [summary, setSummary] = useState(draft?.summary ?? "");
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
+  const [threadPosts, setThreadPosts] = useState<string[]>(() => {
+    const existingPosts = draft?.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean) ?? [];
+    return existingPosts.length > 0 ? existingPosts : ["", ""];
+  });
+  const [isThread, setIsThread] = useState(() => {
+    const existingPosts = draft?.content.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean) ?? [];
+    return draft?.targetKind === 1 && (
+      (draft?.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true') ?? false) || existingPosts.length > 1
+    );
+  });
   const [coverImage, setCoverImage] = useState<string | undefined>(
     draft?.coverImage,
   );
@@ -90,6 +101,14 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   // Track if initial mount to avoid auto-save on first render
   const isInitialMount = useRef(true);
+
+  const threadContent = (posts: string[] = threadPosts) =>
+    posts.map((post) => post.trim()).filter(Boolean).join("\n---\n");
+
+  const tagsForCurrentMode = () => {
+    const baseTags = draft?.tags.filter((tag) => tag[0] !== 'ghostr-thread') ?? [];
+    return isThread ? [...baseTags, ['ghostr-thread', 'true']] : baseTags;
+  };
 
   // Stable callback for MarkdownEditor onChange
   const handleMarkdownChange = useCallback((val: string) => {
@@ -237,9 +256,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
     if (currentDraftId && hasChanges) {
       // For kind 1 notes, append images and links at the end
-      let finalContent = debouncedContentLocal.trim();
+      let finalContent = (isThread ? threadContent() : debouncedContentLocal).trim();
 
-      if (!isLongForm) {
+      if (!isLongForm && !isThread) {
         if (debouncedImagesLocal.length > 0) {
           finalContent += '\n' + debouncedImagesLocal.join('\n');
         }
@@ -253,6 +272,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         summary: isLongForm && debouncedSummaryLocal.trim() ? debouncedSummaryLocal : undefined,
         content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
+        tags: tagsForCurrentMode(),
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
         uploadedImages: !isLongForm && debouncedImagesLocal.length > 0 ? debouncedImagesLocal : undefined,
@@ -346,6 +366,55 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
   const handleKindChange = (checked: boolean) => {
     setIsLongForm(checked);
+    setIsThread(false);
+    setHasChanges(true);
+  };
+
+  const handleThreadModeChange = () => {
+    if (!isThread) {
+      const splitPosts = content
+        .split(/\n\s*---\s*\n/g)
+        .map((post) => post.trim())
+        .filter(Boolean);
+      setThreadPosts(splitPosts.length > 0 ? splitPosts : ["", ""]);
+    }
+    setIsLongForm(false);
+    setIsThread(true);
+    setHasChanges(true);
+  };
+
+  const handleThreadPostChange = (index: number, value: string) => {
+    setThreadPosts((posts) => {
+      const nextPosts = posts.map((post, i) => (i === index ? value : post));
+      setContent(threadContent(nextPosts));
+      return nextPosts;
+    });
+    setHasChanges(true);
+  };
+
+  const handleAddThreadPost = () => {
+    setThreadPosts((posts) => [...posts, ""]);
+    setHasChanges(true);
+  };
+
+  const handleRemoveThreadPost = (index: number) => {
+    setThreadPosts((posts) => {
+      const nextPosts = posts.filter((_, i) => i !== index);
+      setContent(threadContent(nextPosts));
+      return nextPosts;
+    });
+    setHasChanges(true);
+  };
+
+  const handleSplitThreadPaste = () => {
+    const splitPosts = threadPosts
+      .join("\n---\n")
+      .split(/\n\s*---\s*\n/g)
+      .map((post) => post.trim())
+      .filter(Boolean);
+    const nextPosts = splitPosts.length > 0 ? splitPosts : [""];
+    setThreadPosts(nextPosts);
+    setContent(threadContent(nextPosts));
     setHasChanges(true);
   };
 
@@ -398,9 +467,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     if (!draft) return;
 
     // For kind 1 notes, append images and links at the end
-    let finalContent = content.trim();
+    let finalContent = (isThread ? threadContent() : content).trim();
 
-    if (!isLongForm) {
+    if (!isLongForm && !isThread) {
       if (attachedImages.length > 0) {
         finalContent += '\n' + attachedImages.join('\n');
       }
@@ -414,6 +483,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       summary: isLongForm && summary.trim() ? summary : undefined,
       content: finalContent,
       targetKind: isLongForm ? 30023 : 1,
+      tags: tagsForCurrentMode(),
       targetPublisher: selectedPublisher ?? undefined,
       coverImage: isLongForm ? coverImage : undefined,
       uploadedImages: !isLongForm && attachedImages.length > 0 ? attachedImages : undefined,
@@ -428,13 +498,29 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   };
 
   const handleSubmitForReview = () => {
-    if (!content.trim()) {
+    if (!(isThread ? threadContent() : content).trim()) {
       toast({
         title: "Cannot submit",
         description: "Please add some content before submitting.",
         variant: "destructive",
       });
       return;
+    }
+    if (isThread && threadPosts.map((post) => post.trim()).filter(Boolean).length < 2) {
+      toast({
+        title: "Cannot submit thread",
+        description: "Add at least two non-empty posts before submitting a thread.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (draft) {
+      updateDraft(draft.id, {
+        content: (isThread ? threadContent() : content).trim(),
+        targetKind: isLongForm ? 30023 : 1,
+        tags: tagsForCurrentMode(),
+        targetPublisher: selectedPublisher ?? undefined,
+      });
     }
     setSubmitDialogOpen(true);
   };
@@ -460,9 +546,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
     // Save before going back if there are changes
     if (draft && hasChanges) {
       // For kind 1 notes, append images and links at the end
-      let finalContent = content.trim();
+      let finalContent = (isThread ? threadContent() : content).trim();
 
-      if (!isLongForm) {
+      if (!isLongForm && !isThread) {
         if (attachedImages.length > 0) {
           finalContent += '\n' + attachedImages.join('\n');
         }
@@ -476,6 +562,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
         summary: isLongForm && summary.trim() ? summary : undefined,
         content: finalContent,
         targetKind: isLongForm ? 30023 : 1,
+        tags: tagsForCurrentMode(),
         targetPublisher: selectedPublisher ?? undefined,
         coverImage: isLongForm ? coverImage : undefined,
         uploadedImages: !isLongForm && attachedImages.length > 0 ? attachedImages : undefined,
@@ -653,11 +740,78 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="content">Content</Label>
-              {!isLongForm && !isSubmittedOrPublished && (
+              {!isLongForm && !isThread && !isSubmittedOrPublished && (
                 <ImageUploadButton onUpload={handleImageUpload} />
               )}
             </div>
-            {isLongForm ? (
+            {isThread ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-sm text-muted-foreground">
+                  Thread submissions are sent for publisher review as ordered kind 1 posts.
+                  Paste a draft separated by lines containing only <code className="font-mono">---</code>, then split into posts.
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSplitThreadPaste}
+                    disabled={isSubmittedOrPublished}
+                  >
+                    Split on ---
+                  </Button>
+                </div>
+                {threadPosts.map((post, index) => (
+                  <div key={index} className="rounded-2xl border bg-background p-4 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`thread-post-${index}`}>Post {index + 1}</Label>
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "text-xs",
+                          post.length > 280 ? "text-destructive" : "text-muted-foreground"
+                        )}>
+                          {post.length}/280
+                        </span>
+                        {threadPosts.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemoveThreadPost(index)}
+                            disabled={isSubmittedOrPublished}
+                            title="Remove post"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <MentionPillTextarea
+                      value={post}
+                      onChange={(value) => handleThreadPostChange(index, value)}
+                      placeholder={index === 0 ? "Start your thread..." : "Continue the thread..."}
+                      disabled={isSubmittedOrPublished}
+                      minHeight="140px"
+                    />
+                  </div>
+                ))}
+                <div className="flex items-center justify-end gap-3 border-t pt-3">
+                  <div className="h-8 w-8 rounded-full border border-muted-foreground/30" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleAddThreadPost}
+                    disabled={isSubmittedOrPublished}
+                    className="h-8 w-8 rounded-full border-primary/50 text-primary hover:bg-primary/10"
+                    title="Add post"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : isLongForm ? (
               <MarkdownEditor
                 value={content}
                 onChange={handleMarkdownChange}
@@ -688,9 +842,12 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               </>
             )}
             <p className="text-xs text-muted-foreground">
-              {content.length} characters
+              {isThread
+                ? `${threadPosts.length} post${threadPosts.length !== 1 ? "s" : ""} · ${threadPosts.reduce((sum, post) => sum + post.length, 0)} total characters`
+                : `${content.length} characters`}
               {hasImages &&
                 !isLongForm &&
+                !isThread &&
                 ` | ${attachedImages.length} image${attachedImages.length !== 1 ? "s" : ""}`}
             </p>
           </div>
@@ -822,7 +979,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 disabled={isSubmittedOrPublished}
                 className={cn(
                   'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
-                  !isLongForm
+                  !isLongForm && !isThread
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                   isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
@@ -835,7 +992,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 disabled={isSubmittedOrPublished}
                 className={cn(
                   'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
-                  isLongForm
+                  isLongForm && !isThread
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                   isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
@@ -843,9 +1000,24 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               >
                 Long-form
               </button>
+              <button
+                onClick={handleThreadModeChange}
+                disabled={isSubmittedOrPublished}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors',
+                  isThread
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                  isSubmittedOrPublished && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                Thread
+              </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isLongForm
+              {isThread
+                ? "Threads submit as multiple kind 1 posts for publisher review and sequential publishing."
+                : isLongForm
                 ? "Long-form articles (NIP-23, kind 30023) support markdown and are best for blog posts and articles."
                 : "Short notes (kind 1) are like tweets - brief updates and thoughts."}
             </p>

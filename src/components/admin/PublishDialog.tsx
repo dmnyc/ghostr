@@ -54,6 +54,17 @@ export function PublishDialog({
   const [error, setError] = useState<string | null>(null)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
 
+  const splitThreadPosts = (value: string) =>
+    value.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
+  const hasThreadTag = submission.tags.some((tag) => tag[0] === 'ghostr-thread' && tag[1] === 'true')
+  const payloadThreadPosts = submission.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? []
+  const contentThreadPosts = splitThreadPosts(editedContent)
+  const isThreadSubmission = submission.kind === 1 && (hasThreadTag || payloadThreadPosts.length > 1 || contentThreadPosts.length > 1)
+  const dialogThreadPosts = isThreadSubmission
+    ? (contentThreadPosts.length > 1 ? contentThreadPosts : payloadThreadPosts)
+    : []
+  const overLimitCount = dialogThreadPosts.filter((post) => post.length > 280).length
+
   const handlePublish = async () => {
     if (!ndk || !signer) {
       setError('Not connected or authenticated')
@@ -70,6 +81,85 @@ export function PublishDialog({
     setError(null)
 
     try {
+      const isThread = isThreadSubmission
+      const editedThreadPosts = isThread
+        ? (editedContent.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean).length > 1
+          ? editedContent.split(/\n\s*---\s*\n/g).map((post) => post.trim()).filter(Boolean)
+          : (submission.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? []))
+        : []
+
+      if (isThread && submission.kind === 1) {
+        if (editedThreadPosts.length < 2) {
+          setError('Threads need at least two non-empty posts before publishing')
+          setIsPublishing(false)
+          return
+        }
+        const publishedIds: string[] = []
+        let publisherPubkey: string | undefined
+        for (const [index, postContent] of editedThreadPosts.entries()) {
+          const threadEvent = new NDKEvent(ndk)
+          threadEvent.kind = 1
+          threadEvent.content = postContent
+          const tags: string[][] = submission.tags.filter((t) => t[0] !== 'ghostr-thread')
+          if (includeCredit) {
+            tags.push(['client', 'Ghostr'])
+          }
+          if (index > 0) {
+            const rootId = publishedIds[0]
+            const replyId = publishedIds[publishedIds.length - 1]
+            if (!rootId || !replyId) throw new Error('Missing thread root or reply event id')
+            tags.push(['e', rootId, '', 'root'])
+            tags.push(['e', replyId, '', 'reply'])
+            if (publisherPubkey) {
+              tags.push(['p', publisherPubkey])
+            }
+          }
+          threadEvent.tags = tags
+          await threadEvent.sign(signer)
+          publisherPubkey = publisherPubkey || threadEvent.pubkey
+          await threadEvent.publish()
+          publishedIds.push(threadEvent.id)
+        }
+
+        const rootEventId = publishedIds[0]
+        if (!rootEventId) throw new Error('No thread posts were published')
+        try {
+          const receipt: ReceiptPayload = {
+            protocol: PROTOCOL_VERSION,
+            type: 'receipt',
+            submissionId: submission.id,
+            action: 'approved',
+            eventId: rootEventId,
+            timestamp: Date.now(),
+          }
+          await sendGiftWrappedReceipt(submission.delegatePubkey, receipt)
+        } catch (receiptError) {
+          console.error('Failed to send receipt:', receiptError)
+        }
+
+        markAsApproved(submission.id, rootEventId)
+        publishedIds.forEach((eventId, index) => {
+          addItem({
+            id: eventId,
+            content: editedThreadPosts[index] || '',
+            kind: 1,
+            publishedAt: Date.now(),
+            source: 'delegate',
+            delegatePubkey: submission.delegatePubkey,
+            delegateNpub: submission.delegateNpub,
+          })
+        })
+
+        toast({
+          title: 'Thread published successfully',
+          description: `${publishedIds.length} posts have been published as a thread.`,
+        })
+
+        onOpenChange(false)
+        onSuccess()
+        return
+      }
+
       // Normalize line breaks for markdown: convert single \n to \n\n for proper paragraph breaks
       const normalizedContent = editedContent.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
 
@@ -199,19 +289,21 @@ export function PublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publish Content</DialogTitle>
+          <DialogTitle>{isThreadSubmission ? 'Publish Thread' : 'Publish Content'}</DialogTitle>
           <DialogDescription>
-            This will create a new event signed with your key and publish it to your relays.
+            {isThreadSubmission
+              ? 'This will publish each thread post sequentially with root/reply tags, signed with your key.'
+              : 'This will create a new event signed with your key and publish it to your relays.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="rounded-lg bg-muted p-4 space-y-2">
+          <div className="rounded-lg bg-muted p-4 space-y-3">
             <h4 className="font-medium text-sm">Event Preview</h4>
             <div className="text-xs space-y-1">
               <div>
                 <span className="text-muted-foreground">Kind:</span>{' '}
-                {submission.kind}
+                {isThreadSubmission ? `${dialogThreadPosts.length} thread posts` : submission.kind}
               </div>
               <div>
                 <span className="text-muted-foreground">Content length:</span>{' '}
@@ -219,9 +311,24 @@ export function PublishDialog({
               </div>
               <div>
                 <span className="text-muted-foreground">Tags:</span>{' '}
-                {submission.tags.length} tag(s)
+                {submission.tags.filter((tag) => tag[0] !== 'ghostr-thread').length} public tag(s)
               </div>
             </div>
+            {isThreadSubmission && (
+              <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                {dialogThreadPosts.map((post, index) => (
+                  <div key={index} className="rounded-md border bg-background p-3 text-xs space-y-1">
+                    <div className="flex items-center justify-between font-medium">
+                      <span>Post {index + 1}</span>
+                      <span className={post.length > 280 ? 'text-destructive' : 'text-muted-foreground'}>
+                        {post.length}/280
+                      </span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-muted-foreground line-clamp-3">{post}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="text-sm text-muted-foreground">
@@ -230,6 +337,15 @@ export function PublishDialog({
               submission has been approved and published.
             </p>
           </div>
+
+          {isThreadSubmission && overLimitCount > 0 && (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <span className="text-sm">
+                {overLimitCount} post{overLimitCount === 1 ? '' : 's'} exceed 280 characters. They can still publish to Nostr, but may not fit X-style limits.
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-destructive">
@@ -259,7 +375,7 @@ export function PublishDialog({
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}
-              {isPublishing ? 'Publishing...' : 'Publish to Nostr'}
+              {isPublishing ? 'Publishing...' : isThreadSubmission ? `Publish ${dialogThreadPosts.length} posts` : 'Publish to Nostr'}
             </Button>
           </div>
         </DialogFooter>
