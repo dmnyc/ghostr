@@ -10,6 +10,9 @@ import {
   Loader2,
   User,
   Image as ImageIcon,
+  Heading1,
+  Heading2,
+  Heading3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -142,6 +145,38 @@ export function MarkdownEditor({
   };
 
   const handleCode = () => insertMarkdown("`", "`", "code");
+
+  const handleHeading = (level: 1 | 2 | 3) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    const lineStart = value.lastIndexOf("\n", cursorPos - 1) + 1;
+    const lineText = value.substring(lineStart);
+    const headingPrefix = "#".repeat(level) + " ";
+
+    const existingMatch = lineText.match(/^(#{1,6}) /);
+    let newValue: string;
+    if (existingMatch) {
+      newValue =
+        value.substring(0, lineStart) +
+        headingPrefix +
+        value.substring(lineStart + existingMatch[0].length);
+    } else {
+      newValue =
+        value.substring(0, lineStart) +
+        headingPrefix +
+        value.substring(lineStart);
+    }
+
+    onChange(newValue);
+
+    setTimeout(() => {
+      const newPos = lineStart + headingPrefix.length;
+      textarea.setSelectionRange(newPos, newPos);
+      textarea.focus();
+    }, 0);
+  };
 
   // Image upload handler
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -466,6 +501,40 @@ export function MarkdownEditor({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              onClick={() => handleHeading(1)}
+              disabled={disabled}
+              title="Heading 1"
+            >
+              <Heading1 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => handleHeading(2)}
+              disabled={disabled}
+              title="Heading 2"
+            >
+              <Heading2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => handleHeading(3)}
+              disabled={disabled}
+              title="Heading 3"
+            >
+              <Heading3 className="h-4 w-4" />
+            </Button>
+            <div className="w-px mx-1 bg-border" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={handleBold}
               disabled={disabled}
               title="Bold (Ctrl+B)"
@@ -569,11 +638,7 @@ export function MarkdownEditor({
               onSelect={detectMention}
               placeholder={placeholder}
               disabled={disabled}
-              className="min-h-[400px] rounded-none border-0 resize-y font-mono focus-visible:ring-0 max-w-full overflow-x-auto"
-              style={{
-                wordBreak: 'break-all',
-                overflowWrap: 'anywhere'
-              }}
+              className="min-h-[400px] rounded-none border-0 resize-y font-mono focus-visible:ring-0 max-w-full"
             />
 
             {/* Mention popover */}
