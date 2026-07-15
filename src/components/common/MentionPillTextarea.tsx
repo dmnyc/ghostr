@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils/cn'
 import { useDebounce } from '@/hooks/useDebounce'
 import { renderTextWithMentions, htmlToPlainText, getTextBeforeCursor, createPillElement, pillifyTextNode, serializeRangeToText } from '@/lib/mentionUtils'
 import { extractMentionedPubkeys, NOSTR_ENTITY_RE, decodeNostrEntity } from '@/lib/nostrEntities'
+import { RichNotePreview } from '@/components/common/RichNotePreview'
 
 interface MentionPillTextareaProps {
   value: string
@@ -82,6 +83,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
     const [searchQuery, setSearchQuery] = useState('')
     const [mentionedProfiles, setMentionedProfiles] = useState<Map<string, SearchProfile>>(new Map())
+    const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write')
 
     const internalRef = useRef<HTMLDivElement>(null)
     const contentEditableRef = (ref as React.RefObject<HTMLDivElement>) || internalRef
@@ -152,7 +154,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       if (editor.innerHTML !== newHTML) {
         editor.innerHTML = newHTML
       }
-    }, [value, mentionedProfiles, contentEditableRef])
+    }, [value, mentionedProfiles, contentEditableRef, activeTab])
 
     // Refresh pill labels in-place when profiles resolve (e.g. a pill pasted
     // before its profile was fetched). Mutating textContent of contenteditable
@@ -571,9 +573,38 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     }
 
     return (
-      <div className="relative max-w-full overflow-hidden">
-        <div
-          ref={contentEditableRef}
+      <div className={cn("rounded-lg border overflow-hidden max-w-full", className)}>
+        <div className="flex border-b bg-muted/30">
+          <button
+            type="button"
+            className={cn(
+              'px-4 py-2 text-sm font-medium transition-colors',
+              activeTab === 'write'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setActiveTab('write')}
+          >
+            Write
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'px-4 py-2 text-sm font-medium transition-colors',
+              activeTab === 'preview'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => { setActiveTab('preview'); setIsOpen(false); setSearchQuery('') }}
+          >
+            Preview
+          </button>
+        </div>
+
+        {activeTab === 'write' ? (
+          <div className="relative max-w-full overflow-hidden">
+            <div
+              ref={contentEditableRef}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onBeforeInput={handleBeforeInput}
@@ -584,10 +615,9 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           onFocus={() => { hasUserInteracted.current = true }}
           contentEditable={!disabled}
           className={cn(
-            'relative p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'relative p-3 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
             'whitespace-pre-wrap break-words max-w-full overflow-x-auto',
-            disabled && 'opacity-50 cursor-not-allowed',
-            className
+            disabled && 'opacity-50 cursor-not-allowed'
           )}
           style={{
             minHeight,
@@ -684,6 +714,16 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
             pointer-events: none;
           }
         `}</style>
+          </div>
+        ) : (
+          <div className="p-3" style={{ minHeight }}>
+            {value.trim() ? (
+              <RichNotePreview content={value} className="text-sm" />
+            ) : (
+              <p className="text-muted-foreground italic">Nothing to preview</p>
+            )}
+          </div>
+        )}
       </div>
     )
   }
