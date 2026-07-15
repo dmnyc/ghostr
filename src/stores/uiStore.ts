@@ -12,6 +12,7 @@ interface UIStore {
   isLoginModalOpen: boolean
   isSubmitDialogOpen: boolean
   isPublishDialogOpen: boolean
+  whatsNewOpen: boolean
 
   initializeRole: () => void
   setActiveRole: (role: Role) => void
@@ -21,6 +22,7 @@ interface UIStore {
   setLoginModalOpen: (open: boolean) => void
   setSubmitDialogOpen: (open: boolean) => void
   setPublishDialogOpen: (open: boolean) => void
+  setWhatsNewOpen: (open: boolean) => void
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -29,6 +31,7 @@ export const useUIStore = create<UIStore>((set) => ({
   isLoginModalOpen: false,
   isSubmitDialogOpen: false,
   isPublishDialogOpen: false,
+  whatsNewOpen: false,
 
   initializeRole: () => {
     // Check for persisted role first (page reload case)
@@ -65,4 +68,5 @@ export const useUIStore = create<UIStore>((set) => ({
   setLoginModalOpen: (open) => set({ isLoginModalOpen: open }),
   setSubmitDialogOpen: (open) => set({ isSubmitDialogOpen: open }),
   setPublishDialogOpen: (open) => set({ isPublishDialogOpen: open }),
+  setWhatsNewOpen: (open) => set({ whatsNewOpen: open }),
 }))
