@@ -9,6 +9,7 @@ import { CoverImageInput } from '@/components/common/CoverImageInput'
 import { ImageUploadButton } from '@/components/common/ImageUploadButton'
 import { ImageThumbnailGrid } from '@/components/common/ImageThumbnailGrid'
 import { LinkPreviewGrid } from '@/components/common/LinkPreviewGrid'
+import { ShortNoteLengthWarning } from '@/components/common/ShortNoteLengthWarning'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -49,6 +50,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [summary, setSummary] = useState('')
   const [content, setContent] = useState('')
   const [isLongForm, setIsLongForm] = useState(false)
+  const [lengthWarningDismissed, setLengthWarningDismissed] = useState(false)
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -569,6 +571,12 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                   links={attachedLinks}
                   onRemove={handleRemoveLink}
                   disabled={isPublishing}
+                />
+                <ShortNoteLengthWarning
+                  content={content}
+                  dismissed={lengthWarningDismissed}
+                  onDismiss={() => setLengthWarningDismissed(true)}
+                  onConvert={() => setIsLongForm(true)}
                 />
               </>
             )}
