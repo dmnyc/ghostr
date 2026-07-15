@@ -8,7 +8,7 @@ import { nip19 } from 'nostr-tools'
 import { cn } from '@/lib/utils/cn'
 import { useDebounce } from '@/hooks/useDebounce'
 import { renderTextWithMentions, htmlToPlainText, getTextBeforeCursor, createPillElement, pillifyTextNode, serializeRangeToText } from '@/lib/mentionUtils'
-import { extractMentionedPubkeys, NOSTR_ENTITY_RE } from '@/lib/nostrEntities'
+import { extractMentionedPubkeys, NOSTR_ENTITY_RE, decodeNostrEntity } from '@/lib/nostrEntities'
 
 interface MentionPillTextareaProps {
   value: string
@@ -153,6 +153,24 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         editor.innerHTML = newHTML
       }
     }, [value, mentionedProfiles, contentEditableRef])
+
+    // Refresh pill labels in-place when profiles resolve (e.g. a pill pasted
+    // before its profile was fetched). Mutating textContent of contenteditable
+    // pills doesn't disturb the caret, so this is safe to run while focused.
+    useEffect(() => {
+      const editor = contentEditableRef.current
+      if (!editor) return
+      editor.querySelectorAll<HTMLElement>('[data-mention]').forEach((span) => {
+        const uri = span.dataset.mention
+        if (!uri) return
+        const decoded = decodeNostrEntity(uri)
+        if (!decoded?.pubkey) return
+        const profile = mentionedProfiles.get(decoded.pubkey)
+        if (!profile) return
+        const label = `@${getDisplayName(profile)}`
+        if (span.textContent !== label) span.textContent = label
+      })
+    }, [mentionedProfiles, contentEditableRef])
 
     // Handle before input to make mentions atomic
     const handleBeforeInput = (event: React.FormEvent<HTMLDivElement>) => {
