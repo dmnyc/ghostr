@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   Bold,
   Italic,
@@ -21,18 +21,37 @@ import {
   PopoverContent,
   PopoverAnchor,
 } from "@/components/ui/popover";
-import { parseMarkdown } from "@/lib/utils/markdown";
+import { renderMarkdownRich } from "@/lib/utils/markdown";
 import { useProfileSearch } from "@/hooks/useProfileSearch";
+import { useProfileQueries } from "@/hooks/queries/useProfileQuery";
 import {
   getDisplayName,
   formatNpub,
   type SearchProfile,
 } from "@/services/profileSearchService";
+import { extractMentionedPubkeys, NOSTR_ENTITY_RE } from "@/lib/nostrEntities";
 import { nip19 } from "nostr-tools";
 import { cn } from "@/lib/utils/cn";
 import { uploadToBlossom } from "@/lib/blossom";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/hooks/useToast";
+
+/**
+ * If a position falls strictly inside a nostr token, return the token's end so
+ * a toolbar wrap (bold/link/etc.) inserts outside the identifier instead of
+ * splicing it. Source stays plaintext, so this is the long-form safety net for
+ * accidental breakage (the textarea itself can't host atomic pills).
+ */
+function snapOutsideTokens(value: string, pos: number): number {
+  NOSTR_ENTITY_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = NOSTR_ENTITY_RE.exec(value)) !== null) {
+    const start = match.index;
+    const end = match.index + match[0].length;
+    if (pos > start && pos < end) return end;
+  }
+  return pos;
+}
 
 interface MarkdownEditorProps {
   value: string;
@@ -72,6 +91,17 @@ export function MarkdownEditor({
   const { results, isLoading, search, clear } = useProfileSearch(300);
   const { signer } = useAuthStore();
 
+  // Resolve mentioned profiles so the preview renders @name instead of raw npubs
+  const mentionedPubkeys = useMemo(() => extractMentionedPubkeys(value), [value]);
+  const { profiles: mentionedProfiles } = useProfileQueries(mentionedPubkeys);
+  const resolveName = useCallback(
+    (pubkey: string) => {
+      const profile = mentionedProfiles.find((p) => p.pubkey === pubkey);
+      return profile ? getDisplayName(profile) : undefined;
+    },
+    [mentionedProfiles],
+  );
+
   const insertMarkdown = (
     before: string,
     after: string = "",
@@ -80,8 +110,9 @@ export function MarkdownEditor({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    // Snap selection out of any nostr token so wraps never splice an identifier
+    const start = snapOutsideTokens(value, textarea.selectionStart);
+    const end = snapOutsideTokens(value, textarea.selectionEnd);
     const selectedText = value.substring(start, end) || defaultText;
 
     const newValue =
@@ -273,8 +304,10 @@ export function MarkdownEditor({
       search(query);
       setIsMentionOpen(true);
 
-      // Calculate popover position
-      updatePopoverPosition(textarea, startIndex);
+      // Position the popover at the caret (after the typed query), matching the
+      // short-form editor. Passing `startIndex` (the @) would shift it left by
+      // the width of the query.
+      updatePopoverPosition(textarea, cursorPos);
     } else {
       setMentionMatch(null);
       setIsMentionOpen(false);
@@ -284,26 +317,34 @@ export function MarkdownEditor({
 
   const updatePopoverPosition = (
     textarea: HTMLTextAreaElement,
-    startIndex: number,
+    caretIndex: number,
   ) => {
-    const div = document.createElement("div");
+    const textareaRect = textarea.getBoundingClientRect();
     const style = window.getComputedStyle(textarea);
 
-    div.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow: hidden;
-      width: ${textarea.clientWidth}px;
-      font: ${style.font};
-      padding: ${style.padding};
-      border: ${style.border};
-      line-height: ${style.lineHeight};
-    `;
+    const div = document.createElement("div");
+    // Overlay the textarea so the mirror's caret maps directly onto it.
+    // (A body-appended mirror with no top/left lands at its static flow
+    // position, which makes spanRect - textareaRect meaningless.)
+    div.style.position = "absolute";
+    div.style.top = `${textareaRect.top + window.scrollY}px`;
+    div.style.left = `${textareaRect.left + window.scrollX}px`;
+    div.style.visibility = "hidden";
 
-    const textBeforeCursor = value.substring(0, startIndex);
-    div.textContent = textBeforeCursor;
+    // Mirror the textarea's box + typography so wrapping matches exactly.
+    const props = [
+      "boxSizing", "fontFamily", "fontSize", "fontWeight", "fontStyle",
+      "fontVariant", "lineHeight", "letterSpacing", "wordSpacing", "tabSize",
+      "textIndent", "textTransform", "paddingTop", "paddingRight", "paddingBottom",
+      "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth",
+      "borderLeftWidth", "whiteSpace", "wordBreak",
+    ];
+    props.forEach((p) => div.style.setProperty(p, style.getPropertyValue(p)));
+    div.style.whiteSpace = "pre-wrap";
+    div.style.overflowWrap = "break-word";
+    div.style.width = `${textarea.clientWidth}px`;
+
+    div.textContent = value.substring(0, caretIndex);
 
     const span = document.createElement("span");
     span.textContent = "@";
@@ -312,16 +353,17 @@ export function MarkdownEditor({
     document.body.appendChild(div);
 
     const spanRect = span.getBoundingClientRect();
-    const textareaRect = textarea.getBoundingClientRect();
 
-    const top = spanRect.top - textareaRect.top + textarea.scrollTop + 24;
+    // Caret-line bottom relative to the textarea's top, minus the textarea's
+    // internal scroll (the mirror itself isn't scrolled).
+    const top = spanRect.bottom - textareaRect.top - textarea.scrollTop;
     const left = spanRect.left - textareaRect.left;
 
     document.body.removeChild(div);
 
     setPopoverPosition({
       top: Math.min(top, textarea.clientHeight - 20),
-      left: Math.min(left, textarea.clientWidth - 200),
+      left: Math.max(0, Math.min(left, textarea.clientWidth - 200)),
     });
   };
 
@@ -438,19 +480,8 @@ export function MarkdownEditor({
     detectMention();
   };
 
-  // Render mentions in preview as links
-  const renderPreview = () => {
-    // Replace nostr:npub mentions with styled links
-    let html = parseMarkdown(value);
-
-    // Simple replacement for nostr: URIs in the preview
-    html = html.replace(
-      /nostr:(npub1[a-zA-Z0-9]{58})/g,
-      '<a href="https://jumble.social/notes/$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">@$1</a>',
-    );
-
-    return html;
-  };
+  // Faithful preview: markdown structure + inline media + @name mention chips
+  const renderPreview = () => renderMarkdownRich(value, resolveName);
 
   return (
     <div className={cn("rounded-lg border overflow-hidden max-w-full", className)}>
@@ -726,12 +757,28 @@ export function MarkdownEditor({
         </>
       ) : (
         /* Preview */
-        <div className="p-4 min-h-[400px] prose prose-sm dark:prose-invert max-w-none">
+        <div className="ghostr-md-preview p-4 min-h-[400px] prose prose-sm dark:prose-invert max-w-none">
           {value.trim() ? (
             <div dangerouslySetInnerHTML={{ __html: renderPreview() }} />
           ) : (
             <p className="text-muted-foreground italic">Nothing to preview</p>
           )}
+          <style>{`
+            .ghostr-md-preview .mention {
+              background-color: hsl(var(--primary) / 0.1);
+              color: hsl(var(--primary));
+              padding: 0.05rem 0.4rem;
+              border-radius: 0.375rem;
+              font-weight: 500;
+              white-space: nowrap;
+            }
+            .ghostr-md-preview img,
+            .ghostr-md-preview video {
+              max-width: 100%;
+              height: auto;
+              border-radius: 0.375rem;
+            }
+          `}</style>
         </div>
       )}
     </div>
