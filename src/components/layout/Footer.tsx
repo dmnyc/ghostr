@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Github, Zap, User } from 'lucide-react'
+import { Github, Zap, User, Sparkles } from 'lucide-react'
 import packageJson from '../../../package.json'
+import { useUIStore } from '@/stores/uiStore'
 
 export function Footer() {
+  const setWhatsNewOpen = useUIStore((s) => s.setWhatsNewOpen)
   const [zapModal, setZapModal] = useState({
     show: false,
     lightningAddress: 'ghostr@breez.tips',
@@ -53,8 +55,9 @@ export function Footer() {
                 Made with 👻 for the Nostr community
               </span>
             </p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <a
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+              <div className="flex gap-2">
+                <a
                 href={`https://jumble.social/users/${creatorNpub}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -70,7 +73,9 @@ export function Footer() {
                 <Zap size={14} />
                 Zap Creator
               </button>
-              <a
+              </div>
+              <div className="flex gap-2">
+                <a
                 href="https://github.com/dmnyc/ghostr/issues"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -79,6 +84,14 @@ export function Footer() {
                 <Github size={14} />
                 Report Issue
               </a>
+              <button
+                onClick={() => setWhatsNewOpen(true)}
+                className="text-xs px-3 py-1.5 bg-muted hover:bg-muted/80 text-muted-foreground rounded-full transition-colors inline-flex items-center gap-1.5"
+              >
+                <Sparkles size={14} />
+                What's New
+              </button>
+              </div>
             </div>
           </div>
         </div>

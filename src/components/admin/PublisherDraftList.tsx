@@ -6,6 +6,7 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { usePublisherDraftStore } from '@/stores/publisherDraftStore'
 import { savePublisherDraftNIP37 } from '@/lib/nostr/nip37'
 import type { PublisherDraft } from '@/types/publisherDraft'
+import { RichNotePreview } from '@/components/common/RichNotePreview'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,10 +75,6 @@ function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardPro
     }
   }
 
-  const excerpt = draft.content
-    ? draft.content.slice(0, 100) + (draft.content.length > 100 ? '...' : '')
-    : 'No content yet'
-
   const formattedDate = new Date(draft.updatedAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -104,7 +101,11 @@ function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardPro
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
+        {draft.content ? (
+          <RichNotePreview content={draft.content} compact maxLength={100} className="text-sm text-muted-foreground" />
+        ) : (
+          <p className="text-sm text-muted-foreground">No content yet</p>
+        )}
       </CardContent>
 
       <CardFooter className="gap-2">

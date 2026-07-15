@@ -23,6 +23,7 @@ import { CoverImageInput } from "@/components/common/CoverImageInput";
 import { ImageUploadButton } from "@/components/common/ImageUploadButton";
 import { ImageThumbnailGrid } from "@/components/common/ImageThumbnailGrid";
 import { LinkPreviewGrid } from "@/components/common/LinkPreviewGrid";
+import { ShortNoteLengthWarning } from "@/components/common/ShortNoteLengthWarning";
 import { SubmitDialog } from "./SubmitDialog";
 import { useDraftStore } from "@/stores/draftStore";
 import { useFavoritesStore } from "@/stores/favoritesStore";
@@ -76,6 +77,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [summary, setSummary] = useState(draft?.summary ?? "");
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
+  const [lengthWarningDismissed, setLengthWarningDismissed] = useState(false);
   const [coverImage, setCoverImage] = useState<string | undefined>(
     draft?.coverImage,
   );
@@ -685,6 +687,14 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                   onRemove={handleRemoveLink}
                   disabled={isSubmittedOrPublished}
                 />
+                {!isSubmittedOrPublished && (
+                  <ShortNoteLengthWarning
+                    content={content}
+                    dismissed={lengthWarningDismissed}
+                    onDismiss={() => setLengthWarningDismissed(true)}
+                    onConvert={() => setIsLongForm(true)}
+                  />
+                )}
               </>
             )}
             <p className="text-xs text-muted-foreground">

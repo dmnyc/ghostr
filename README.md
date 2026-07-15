@@ -32,6 +32,11 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **Kind 30023 Articles** - Long-form markdown content with cover images
 - **Image Upload** - Upload to Blossom servers with preview
 - **Image Re-hosting** - Publishers can re-upload delegate images
+- **Mention Pills** - @mentions become atomic pills that can't be split by editing, copy/paste, or formatting; pasted `nostr:` links become pills automatically
+- **Rich Previews** - Notes render inline media, resolved @name mentions, and nostr embeds in the composer and draft/submission cards
+- **Write/Preview Toggle** - Switch between editing and a faithful preview of how a note will appear
+- **Profile Discovery** - @mention username search via nostrarchives.com
+- **Short Note Nudge** - Prompts converting an over-long short note into a long-form article
 - **Draft Management** - Local caching + relay sync via NIP-37
 - **Publish History** - Track all published content
 - **Favorite Publishers** - Quick access to frequent collaborators
@@ -118,7 +123,7 @@ The bot follow feature includes safeguards to prevent accidental data loss:
 
 ## Authentication
 
-Ghostr supports NIP-07 browser extensions (Alby, nos2x, etc.) for signing. Your private keys never leave your extension.
+Ghostr supports NIP-07 browser extensions (Alby, nos2x, Sidecar, etc.) for signing. Your private keys never leave your extension.
 
 **Note:** This application uses **NIP-44** for encryption to ensure modern security standards. It may not work properly with older browser extensions that only support NIP-04 encryption.
 
@@ -133,7 +138,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Built for the Nostr protocol
-- From the creator of [Plebs vs. Zombies](https://plebsvszombies.cc) and [Mutable](https://mutable.top)
+- Profile discovery powered by [nostrarchives.com](https://nostrarchives.com) by [@barrydeen](https://github.com/barrydeen/nostrarchives-api)
+- From the creator of [Sidecar](https://sidecar.top), [Plebs vs. Zombies](https://plebsvszombies.cc), and [Mutable](https://mutable.top)
 
 ## Author
 

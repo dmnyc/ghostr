@@ -1,5 +1,6 @@
 import React from 'react'
-import { type SearchProfile } from '@/services/profileSearchService'
+import { getDisplayName, type SearchProfile } from '@/services/profileSearchService'
+import { NOSTR_ENTITY_RE, decodeNostrEntity, fallbackEntityLabel, type DecodedEntity } from '@/lib/nostrEntities'
 
 /**
  * Renders text with nostr:npub mentions replaced by visual pills
@@ -31,39 +32,46 @@ function textWithLineBreaks(text: string, keyPrefix: string = ''): React.ReactNo
 
 export function renderTextWithMentions(
   text: string,
-  mentionedProfiles: Map<string, SearchProfile>
+  profiles: Map<string, SearchProfile>
 ): React.ReactNode[] {
   if (!text) return []
 
   const parts: React.ReactNode[] = []
   let lastIndex = 0
-  const mentionRegex = /nostr:(npub1[a-z0-9]{58,}|nprofile1[a-z0-9]{58,})/g
+  NOSTR_ENTITY_RE.lastIndex = 0
   let match: RegExpExecArray | null
 
-  while ((match = mentionRegex.exec(text)) !== null) {
-    const fullMention = match[0]
+  while ((match = NOSTR_ENTITY_RE.exec(text)) !== null) {
+    const decoded = match[1] ? decodeNostrEntity(match[1]) : null
     const beforeText = text.substring(lastIndex, match.index)
 
     if (beforeText) {
       parts.push(...textWithLineBreaks(beforeText, `text-${lastIndex}`))
     }
 
-    const profile = mentionedProfiles.get(fullMention)
-    const displayName = profile?.displayName || profile?.name || fullMention.substring(6, 16) + '...'
+    // npub/nprofile render as atomic mention pills (resolved by pubkey so an
+    // nprofile mention shows the profile name, not a truncated npub). note /
+    // nevent / naddr fall through as plain text here — rich rendering is Phase 5.
+    if (decoded && (decoded.type === 'npub' || decoded.type === 'nprofile')) {
+      const profile = decoded.pubkey ? profiles.get(decoded.pubkey) : undefined
+      const label = profile ? `@${getDisplayName(profile)}` : fallbackEntityLabel(decoded)
 
-    parts.push(
-      <span
-        key={`mention-${match.index}`}
-        contentEditable={false}
-        data-mention={fullMention}
-        className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-md font-medium"
-        style={{ userSelect: 'all' }}
-      >
-        @{displayName}
-      </span>
-    )
+      parts.push(
+        <span
+          key={`mention-${match.index}`}
+          contentEditable={false}
+          data-mention={decoded.uri}
+          className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-md font-medium"
+          style={{ userSelect: 'all' }}
+        >
+          {label}
+        </span>
+      )
+    } else if (match[0]) {
+      parts.push(...textWithLineBreaks(match[0], `raw-${match.index}`))
+    }
 
-    lastIndex = match.index + fullMention.length
+    lastIndex = match.index + match[0].length
   }
 
   if (lastIndex < text.length) {
@@ -159,4 +167,83 @@ export function getTextBeforeCursor(element: HTMLDivElement): string {
   tempDiv.appendChild(preCaretRange.cloneContents())
 
   return htmlToPlainText(tempDiv)
+}
+
+/**
+ * Build a mention pill DOM node. `data-mention` carries the canonical
+ * `nostr:...` URI so the serializer round-trips it verbatim. The element is
+ * `contenteditable=false` + `user-select:all`, making it an atomic island:
+ * the caret cannot enter it and selection grabs the whole pill.
+ */
+export function createPillElement(uri: string, label: string): HTMLSpanElement {
+  const pill = document.createElement('span')
+  pill.contentEditable = 'false'
+  pill.dataset.mention = uri
+  pill.className =
+    'inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-md font-medium'
+  pill.style.userSelect = 'all'
+  pill.textContent = label
+  return pill
+}
+
+/**
+ * Replace a text node containing nostr mentions with a mixed sequence of
+ * plain-text nodes and atomic pill spans (in place, preserving document order).
+ * Used to pillify pasted text immediately so a pasted `nostr:npub1...` can
+ * never be left as breakable plain text. Returns the last inserted node
+ * (for caret placement) and whether any tokens were converted.
+ */
+export function pillifyTextNode(
+  textNode: Text,
+  profiles: Map<string, SearchProfile>,
+): { lastNode: Node; hadTokens: boolean } {
+  const text = textNode.textContent || ''
+  const parent = textNode.parentNode
+  if (!parent) return { lastNode: textNode, hadTokens: false }
+
+  const tokens: Array<{ index: number; length: number; decoded: DecodedEntity }> = []
+  NOSTR_ENTITY_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = NOSTR_ENTITY_RE.exec(text)) !== null) {
+    if (!match[1]) continue
+    const decoded = decodeNostrEntity(match[1])
+    if (decoded && (decoded.type === 'npub' || decoded.type === 'nprofile')) {
+      tokens.push({ index: match.index, length: match[0].length, decoded })
+    }
+  }
+
+  if (tokens.length === 0) return { lastNode: textNode, hadTokens: false }
+
+  let cursor = 0
+  let lastNode: Node = textNode
+  for (const t of tokens) {
+    if (t.index > cursor) {
+      parent.insertBefore(document.createTextNode(text.slice(cursor, t.index)), textNode)
+    }
+    const profile = t.decoded.pubkey ? profiles.get(t.decoded.pubkey) : undefined
+    const label = profile ? `@${getDisplayName(profile)}` : fallbackEntityLabel(t.decoded)
+    const pill = createPillElement(t.decoded.uri, label)
+    parent.insertBefore(pill, textNode)
+    lastNode = pill
+    cursor = t.index + t.length
+  }
+  if (cursor < text.length) {
+    const tail = document.createTextNode(text.slice(cursor))
+    parent.insertBefore(tail, textNode)
+    lastNode = tail
+  }
+  parent.removeChild(textNode)
+  return { lastNode, hadTokens: true }
+}
+
+/**
+ * Serialize a DOM range to plain text, preserving mention pills as their
+ * `nostr:...` URIs. Used by copy/cut so a copied pill pastes back as a pill
+ * (instead of its visible `@name` label, which would lose the pubkey).
+ */
+export function serializeRangeToText(range: Range): string {
+  const fragment = range.cloneContents()
+  const container = document.createElement('div')
+  container.appendChild(fragment)
+  return htmlToPlainText(container)
 }

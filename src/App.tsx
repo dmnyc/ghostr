@@ -12,7 +12,9 @@ import { PublisherDashboard } from '@/components/admin/PublisherDashboard'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import { LoginDialog } from '@/components/auth/LoginDialog'
 import { GhostNotesPage, GhostNoteViewer } from '@/components/ghostNote'
+import { WhatsNewDialog } from '@/components/common/WhatsNewDialog'
 import { Toaster } from '@/components/ui/toaster'
+import { APP_VERSION, getLastSeenReleaseVersion } from '@/data/releaseNotes'
 
 // Landing page for unauthenticated users
 function LandingPage() {
@@ -61,7 +63,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   const { initialize, connectionStatus } = useNDKStore()
   const { isAuthenticated, restoreSession } = useAuthStore()
-  const { initializeRole, isLoginModalOpen, setLoginModalOpen } = useUIStore()
+  const { initializeRole, isLoginModalOpen, setLoginModalOpen, setWhatsNewOpen } = useUIStore()
 
   // Initialize theme and role from persisted settings
   useEffect(() => {
@@ -79,6 +81,13 @@ function App() {
       restoreSession()
     }
   }, [connectionStatus, restoreSession])
+
+  // Show "What's New" when the app version changes (signed-in users only)
+  useEffect(() => {
+    if (isAuthenticated && getLastSeenReleaseVersion() !== APP_VERSION) {
+      setWhatsNewOpen(true)
+    }
+  }, [isAuthenticated, setWhatsNewOpen])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -159,6 +168,7 @@ function App() {
         open={isLoginModalOpen}
         onOpenChange={setLoginModalOpen}
       />
+      <WhatsNewDialog />
       <Toaster />
     </div>
   )
