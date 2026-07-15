@@ -51,7 +51,7 @@ export function Header() {
   const shortNpub = user ? `${pubkeyToNpub(user.pubkey).slice(0, 16)}...` : ''
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="relative border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <button
           onClick={handleLogoClick}
@@ -62,7 +62,7 @@ export function Header() {
             ghostAnimating && "ghost-float-active"
           )} />
           <span
-            className="text-sm sm:text-lg"
+            className="hidden text-sm sm:text-lg sm:inline"
             style={{ fontFamily: '"Press Start 2P", cursive' }}
           >
             GHOS<span style={{ marginLeft: '-0.15em' }}>TR</span>
@@ -70,40 +70,6 @@ export function Header() {
         </button>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Role switcher - tabbed interface */}
-          {isAuthenticated && (
-            <div className="flex items-center bg-muted rounded-full p-1">
-              <button
-                onClick={() => {
-                  setActiveRole('delegate')
-                  navigate('/dashboard')
-                }}
-                className={cn(
-                  'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
-                  activeRole === 'delegate'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                Delegate
-              </button>
-              <button
-                onClick={() => {
-                  setActiveRole('admin')
-                  navigate('/dashboard')
-                }}
-                className={cn(
-                  'px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium transition-colors',
-                  activeRole === 'admin'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                Publisher
-              </button>
-            </div>
-          )}
-
           {/* Ghost Notes Button */}
           {isAuthenticated && (
             <Button
@@ -135,9 +101,6 @@ export function Header() {
                   ) : (
                     <User className="h-8 w-8 rounded-full bg-muted p-1" />
                   )}
-                  <span className="text-sm font-medium hidden sm:inline max-w-[120px] truncate">
-                    {displayName}
-                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -202,6 +165,42 @@ export function Header() {
           )}
         </div>
       </div>
+
+      {/* Centered role switcher */}
+      {isAuthenticated && (
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center">
+          <div className="pointer-events-auto flex items-center rounded-full bg-muted p-1">
+            <button
+              onClick={() => {
+                setActiveRole('delegate')
+                navigate('/dashboard')
+              }}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 sm:py-2 sm:text-base',
+                activeRole === 'delegate'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Delegate
+            </button>
+            <button
+              onClick={() => {
+                setActiveRole('admin')
+                navigate('/dashboard')
+              }}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 sm:py-2 sm:text-base',
+                activeRole === 'admin'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Publisher
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
