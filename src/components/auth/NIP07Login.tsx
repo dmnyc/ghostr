@@ -176,7 +176,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
 
     if (!hasExtension) {
       setLocalError(
-        "No NIP-07 extension detected. Please install Alby or nos2x.",
+        "No NIP-07 extension detected. Please install Alby, nos2x, or Sidecar.",
       );
       return;
     }
@@ -195,7 +195,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">
         <p>
-          Connect with a browser extension like{" "}
+          Connect with{" "}
           <a
             href="https://getalby.com/alby-extension"
             target="_blank"
@@ -204,7 +204,7 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
           >
             Alby
           </a>
-          {" "}or{" "}
+          ,{" "}
           <a
             href="https://chromewebstore.google.com/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp"
             target="_blank"
@@ -213,7 +213,16 @@ export function NIP07Login({ onSuccess }: NIP07LoginProps) {
           >
             nos2x
           </a>
-          .
+          , or{" "}
+          <a
+            href="https://sidecar.top"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Sidecar
+          </a>
+          {" "}browser extensions.
         </p>
         <p className="mt-1 text-xs text-muted-foreground/70">
           Requires NIP-44 support. Encrypted features won't work without it.

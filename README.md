@@ -123,7 +123,7 @@ The bot follow feature includes safeguards to prevent accidental data loss:
 
 ## Authentication
 
-Ghostr supports NIP-07 browser extensions (Alby, nos2x, etc.) for signing. Your private keys never leave your extension.
+Ghostr supports NIP-07 browser extensions (Alby, nos2x, Sidecar, etc.) for signing. Your private keys never leave your extension.
 
 **Note:** This application uses **NIP-44** for encryption to ensure modern security standards. It may not work properly with older browser extensions that only support NIP-04 encryption.
 
@@ -138,7 +138,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Built for the Nostr protocol
-- From the creator of [Plebs vs. Zombies](https://plebsvszombies.cc) and [Mutable](https://mutable.top)
+- Profile discovery powered by [nostrarchives.com](https://nostrarchives.com) by [@barrydeen](https://github.com/barrydeen/nostrarchives-api)
+- From the creator of [Sidecar](https://sidecar.top), [Plebs vs. Zombies](https://plebsvszombies.cc), and [Mutable](https://mutable.top)
 
 ## Author
 
