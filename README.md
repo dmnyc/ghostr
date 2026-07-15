@@ -32,6 +32,11 @@ All communication between delegates and publishers uses encrypted gift-wrapped m
 - **Kind 30023 Articles** - Long-form markdown content with cover images
 - **Image Upload** - Upload to Blossom servers with preview
 - **Image Re-hosting** - Publishers can re-upload delegate images
+- **Mention Pills** - @mentions become atomic pills that can't be split by editing, copy/paste, or formatting; pasted `nostr:` links become pills automatically
+- **Rich Previews** - Notes render inline media, resolved @name mentions, and nostr embeds in the composer and draft/submission cards
+- **Write/Preview Toggle** - Switch between editing and a faithful preview of how a note will appear
+- **Profile Discovery** - @mention username search via nostrarchives.com
+- **Short Note Nudge** - Prompts converting an over-long short note into a long-form article
 - **Draft Management** - Local caching + relay sync via NIP-37
 - **Publish History** - Track all published content
 - **Favorite Publishers** - Quick access to frequent collaborators
