@@ -7,7 +7,8 @@ import { getDisplayName, formatNpub, type SearchProfile } from '@/services/profi
 import { nip19 } from 'nostr-tools'
 import { cn } from '@/lib/utils/cn'
 import { useDebounce } from '@/hooks/useDebounce'
-import { renderTextWithMentions, htmlToPlainText, getTextBeforeCursor } from '@/lib/mentionUtils'
+import { renderTextWithMentions, htmlToPlainText, getTextBeforeCursor, createPillElement, pillifyTextNode, serializeRangeToText } from '@/lib/mentionUtils'
+import { extractMentionedPubkeys, NOSTR_ENTITY_RE } from '@/lib/nostrEntities'
 
 interface MentionPillTextareaProps {
   value: string
@@ -16,6 +17,48 @@ interface MentionPillTextareaProps {
   disabled?: boolean
   className?: string
   minHeight?: string
+}
+
+/**
+ * If the caret sits strictly inside a plain-text nostr token (one that has not
+ * yet been promoted to an atomic pill), move it to a token boundary so the
+ * pending edit cannot split or partially overwrite the identifier. Insert
+ * operations snap to the token end; backward-delete snaps to the start.
+ */
+function snapCaretOutOfToken(
+  selection: Selection,
+  inputType: string,
+  container: HTMLDivElement,
+): void {
+  const range = selection.getRangeAt(0)
+  if (!range.collapsed) return
+  const node = range.startContainer
+  const offset = range.startOffset
+  if (node.nodeType !== Node.TEXT_NODE) return
+
+  // Skip when the text node lives inside a pill (handled by the pill guard)
+  let parent: Node | null = node.parentNode
+  while (parent && parent !== container) {
+    if (parent.nodeType === Node.ELEMENT_NODE && (parent as HTMLElement).dataset.mention) return
+    parent = parent.parentNode
+  }
+
+  const text = node.textContent || ''
+  NOSTR_ENTITY_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = NOSTR_ENTITY_RE.exec(text)) !== null) {
+    const start = match.index
+    const end = match.index + match[0].length
+    if (offset > start && offset < end) {
+      const target = inputType.startsWith('deleteBackward') ? start : end
+      const newRange = document.createRange()
+      newRange.setStart(node, target)
+      newRange.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(newRange)
+      return
+    }
+  }
 }
 
 /**
@@ -49,35 +92,13 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     const isInitialized = useRef(false)
 
     // Debounce search query for React Query
-    const debouncedQuery = useDebounce(searchQuery, 300)
+    const debouncedQuery = useDebounce(searchQuery, 150)
 
     // Use React Query for profile search with automatic caching
     const { data: results = [], isLoading } = useProfileSearch(debouncedQuery)
 
-    // Extract npub mentions from value and convert to pubkeys
-    const mentionedPubkeys = useMemo(() => {
-      const regex = /nostr:(npub1[a-z0-9]{58,})/g
-      const npubs: string[] = []
-      let match: RegExpExecArray | null
-
-      while ((match = regex.exec(value)) !== null) {
-        if (match[1]) {
-          npubs.push(match[1]) // Extract just the npub part
-        }
-      }
-
-      // Convert npubs to pubkeys
-      return npubs
-        .map((npub) => {
-          try {
-            const decoded = nip19.decode(npub)
-            return decoded.type === 'npub' ? decoded.data : null
-          } catch {
-            return null
-          }
-        })
-        .filter((p): p is string => p !== null)
-    }, [value])
+    // Deduplicated pubkeys referenced by npub/nprofile mentions (for batch fetch)
+    const mentionedPubkeys = useMemo(() => extractMentionedPubkeys(value), [value])
 
     // Fetch all mentioned profiles using React Query
     const { profiles: fetchedProfiles } = useProfileQueries(mentionedPubkeys)
@@ -87,9 +108,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       const newProfiles = new Map<string, SearchProfile>()
 
       fetchedProfiles.forEach((profile) => {
-        const npub = nip19.npubEncode(profile.pubkey)
-        const mention = `nostr:${npub}`
-        newProfiles.set(mention, profile)
+        newProfiles.set(profile.pubkey, profile)
       })
 
       // Only update if the Map actually changed
@@ -106,47 +125,32 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       })
     }, [fetchedProfiles])
 
-    // Update contentEditable when value changes from parent (external change)
+    // (Re)build the contentEditable DOM from value + resolved profiles.
     useEffect(() => {
+      const editor = contentEditableRef.current
+      if (!editor) return
+
+      // Ignore the value echo that follows an internal edit (DOM already updated).
       if (isInternalUpdate.current) {
         isInternalUpdate.current = false
         lastValueRef.current = value
         return
       }
 
-      // On first render, initialize the content
-      // If there are mentions in the value, wait for profiles to be fetched
-      if (!isInitialized.current) {
-        const hasMentions = /nostr:(npub1[a-z0-9]{58,})/.test(value)
-        const profilesLoaded = !hasMentions || mentionedProfiles.size > 0
+      // Re-render when value changes externally, OR when profiles resolve and
+      // the editor isn't focused (avoids clobbering the caret mid-edit). The
+      // editor initializes immediately even if profiles never load (429 /
+      // outage) — pills show a fallback label until the profile resolves.
+      const valueChanged = lastValueRef.current !== value
+      if (!valueChanged && document.activeElement === editor) return
 
-        if (profilesLoaded) {
-          isInitialized.current = true
-          lastValueRef.current = value
+      if (valueChanged) lastValueRef.current = value
+      isInitialized.current = true
 
-          if (contentEditableRef.current) {
-            const nodes = renderTextWithMentions(value, mentionedProfiles)
-            const newHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
-            contentEditableRef.current.innerHTML = newHTML
-          }
-        }
-        return
-      }
-
-      // Only run if value actually changed
-      if (lastValueRef.current === value) {
-        return
-      }
-
-      lastValueRef.current = value
-
-      if (contentEditableRef.current) {
-        const nodes = renderTextWithMentions(value, mentionedProfiles)
-        const newHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
-
-        if (contentEditableRef.current.innerHTML !== newHTML) {
-          contentEditableRef.current.innerHTML = newHTML
-        }
+      const nodes = renderTextWithMentions(value, mentionedProfiles)
+      const newHTML = ReactDOMServer.renderToStaticMarkup(<>{nodes}</>)
+      if (editor.innerHTML !== newHTML) {
+        editor.innerHTML = newHTML
       }
     }, [value, mentionedProfiles, contentEditableRef])
 
@@ -180,6 +184,14 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         const parent = node.parentNode
         if (!parent) break
         node = parent
+      }
+
+      // Prevent splitting or partially editing a plain-text nostr token that
+      // hasn't been promoted to a pill yet (e.g. just typed). Snap the caret to
+      // a token boundary so the default action lands outside the identifier.
+      const inputType = nativeEvent.inputType
+      if (inputType.startsWith('insert') || inputType.startsWith('delete')) {
+        snapCaretOutOfToken(selection, inputType, contentEditableRef.current)
       }
     }
 
@@ -337,12 +349,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         const mention = `nostr:${nip19.npubEncode(profile.pubkey)}`
 
         // Create pill element
-        const pill = document.createElement('span')
-        pill.contentEditable = 'false'
-        pill.dataset.mention = mention
-        pill.className = 'inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-md font-medium'
-        pill.style.userSelect = 'all'
-        pill.textContent = `@${getDisplayName(profile)}`
+        const pill = createPillElement(mention, `@${getDisplayName(profile)}`)
 
         // Insert at current cursor position
         const newRange = document.createRange()
@@ -357,8 +364,8 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
         selection.removeAllRanges()
         selection.addRange(newRange)
 
-        // Update mentioned profiles map
-        setMentionedProfiles((prev) => new Map(prev).set(mention, profile))
+        // Update mentioned profiles map (keyed by pubkey, matching renderTextWithMentions)
+        setMentionedProfiles((prev) => new Map(prev).set(profile.pubkey, profile))
 
         // Trigger input event to update parent state
         if (contentEditableRef.current) {
@@ -392,23 +399,51 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       // For text pastes, strip all formatting and insert as plain text
       e.preventDefault()
       const plainText = e.clipboardData.getData('text/plain')
-      if (plainText) {
-        const selection = window.getSelection()
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0)
-          range.deleteContents()
-          const textNode = document.createTextNode(plainText)
-          range.insertNode(textNode)
-          range.setStartAfter(textNode)
-          range.collapse(true)
-          selection.removeAllRanges()
-          selection.addRange(range)
+      if (!plainText) return
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0) return
 
-          // Trigger input event to update parent state
-          if (contentEditableRef.current) {
-            handleInput({ currentTarget: contentEditableRef.current } as React.FormEvent<HTMLDivElement>)
-          }
-        }
+      const range = selection.getRangeAt(0)
+      range.deleteContents()
+      const textNode = document.createTextNode(plainText)
+      range.insertNode(textNode)
+
+      // Promote any nostr mentions in the pasted text to atomic pills so a
+      // pasted nostr:npub1... / nostr:nprofile1... can never be left as
+      // breakable plain text.
+      const { lastNode } = pillifyTextNode(textNode, mentionedProfiles)
+
+      // Move caret to the end of the inserted content
+      const caret = document.createRange()
+      caret.setStartAfter(lastNode)
+      caret.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(caret)
+
+      if (contentEditableRef.current) {
+        handleInput({ currentTarget: contentEditableRef.current } as React.FormEvent<HTMLDivElement>)
+      }
+    }
+
+    // Copy/cut a selection as the serialized plaintext (pills -> nostr: URIs)
+    // so a copied pill pastes back as a pill instead of its visible @name label.
+    const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return
+      const text = serializeRangeToText(selection.getRangeAt(0))
+      e.clipboardData.setData('text/plain', text)
+      e.preventDefault()
+    }
+
+    const handleCut = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return
+      const text = serializeRangeToText(selection.getRangeAt(0))
+      e.clipboardData.setData('text/plain', text)
+      e.preventDefault()
+      selection.deleteFromDocument()
+      if (contentEditableRef.current) {
+        handleInput({ currentTarget: contentEditableRef.current } as React.FormEvent<HTMLDivElement>)
       }
     }
 
@@ -525,6 +560,8 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           onKeyDown={handleKeyDown}
           onBeforeInput={handleBeforeInput}
           onPaste={handlePaste}
+          onCopy={handleCopy}
+          onCut={handleCut}
           onClick={() => { hasUserInteracted.current = true }}
           onFocus={() => { hasUserInteracted.current = true }}
           contentEditable={!disabled}
@@ -542,7 +579,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           data-placeholder={placeholder}
         />
 
-        <Popover open={isOpen && (results.length > 0 || isLoading)}>
+        <Popover open={isOpen}>
           <PopoverAnchor asChild>
             <div
               className="absolute pointer-events-none"
@@ -563,9 +600,10 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <div ref={listRef} className="max-h-48 overflow-y-auto">
-              {isLoading && results.length === 0 && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              {results.length === 0 && !(!isLoading && debouncedQuery === searchQuery) && (
+                <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching…
                 </div>
               )}
 
@@ -612,7 +650,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
                 </button>
               ))}
 
-              {!isLoading && results.length === 0 && searchQuery && (
+              {!isLoading && results.length === 0 && searchQuery && debouncedQuery === searchQuery && (
                 <div className="px-3 py-4 text-sm text-center text-muted-foreground">
                   No results found
                 </div>
