@@ -5,13 +5,10 @@ import { ProfileDisplay } from '@/components/common/ProfileDisplay'
 import { EmptyState } from '@/components/common/EmptyState'
 import { useSubmissionStore } from '@/stores/submissionStore'
 import type { Submission } from '@/types/submission'
+import { RichNotePreview } from '@/components/common/RichNotePreview'
 
 function ArchivedSubmissionCard({ submission }: { submission: Submission }) {
   const { unarchiveSubmission } = useSubmissionStore()
-
-  const excerpt = submission.content
-    ? submission.content.slice(0, 100) + (submission.content.length > 100 ? '...' : '')
-    : 'No content'
 
   const formattedDate = new Date(submission.receivedAt).toLocaleDateString('en-US', {
     month: 'short',
@@ -35,7 +32,11 @@ function ArchivedSubmissionCard({ submission }: { submission: Submission }) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
+        {submission.content ? (
+          <RichNotePreview content={submission.content} compact maxLength={100} className="text-sm text-muted-foreground" />
+        ) : (
+          <p className="text-sm text-muted-foreground">No content</p>
+        )}
         {submission.note && (
           <div className="mt-2 text-xs bg-muted p-2 rounded break-words">
             <span className="font-medium">Note:</span> {submission.note}

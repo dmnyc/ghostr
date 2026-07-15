@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { useDraftStore } from '@/stores/draftStore'
 import type { Draft } from '@/types/draft'
+import { RichNotePreview } from '@/components/common/RichNotePreview'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,10 +90,6 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
 
   const isSubmitted = draft.status === 'submitted'
 
-  const excerpt = draft.content
-    ? draft.content.slice(0, 100) + (draft.content.length > 100 ? '...' : '')
-    : 'No content yet'
-
   const formattedDate = new Date(draft.updatedAt).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -120,7 +117,11 @@ export function DraftCard({ draft, isArchived = false }: DraftCardProps) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
+        {draft.content ? (
+          <RichNotePreview content={draft.content} compact maxLength={100} className="text-sm text-muted-foreground" />
+        ) : (
+          <p className="text-sm text-muted-foreground">No content yet</p>
+        )}
       </CardContent>
 
       <CardFooter className="gap-2">

@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { ProfileDisplay } from '@/components/common/ProfileDisplay'
 import { useSubmissionStore } from '@/stores/submissionStore'
 import type { Submission } from '@/types/submission'
+import { RichNotePreview } from '@/components/common/RichNotePreview'
 
 interface SubmissionCardProps {
   submission: Submission
@@ -20,10 +21,6 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
   const handleArchive = async () => {
     await archiveSubmission(submission.id)
   }
-
-  const excerpt = submission.content
-    ? submission.content.slice(0, 100) + (submission.content.length > 100 ? '...' : '')
-    : 'No content'
 
   const formattedDate = new Date(submission.receivedAt).toLocaleDateString('en-US', {
     month: 'short',
@@ -56,7 +53,11 @@ export function SubmissionCard({ submission }: SubmissionCardProps) {
       </CardHeader>
 
       <CardContent className="flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-3 break-all">{excerpt}</p>
+        {submission.content ? (
+          <RichNotePreview content={submission.content} compact maxLength={100} className="text-sm text-muted-foreground" />
+        ) : (
+          <p className="text-sm text-muted-foreground">No content</p>
+        )}
         {submission.note && (
           <div className="mt-2 text-xs bg-muted p-2 rounded break-words">
             <span className="font-medium">Note:</span> {submission.note}
