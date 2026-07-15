@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MarkdownEditor } from "@/components/common/MarkdownEditor";
@@ -274,15 +275,13 @@ export function EditArticleEditor({
         </div>
 
         <div className="flex items-center gap-4 self-end sm:self-auto">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Switch
               checked={includeCredit}
-              onChange={(e) => setIncludeCredit(e.target.checked)}
-              className="rounded border-muted-foreground"
+              onCheckedChange={setIncludeCredit}
             />
             Credit Ghostr
-          </label>
+          </div>
           <Button
             onClick={handlePublish}
             disabled={isPublishing || !hasChanges}

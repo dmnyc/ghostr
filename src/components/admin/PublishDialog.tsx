@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubmissionStore } from '@/stores/submissionStore'
@@ -240,15 +241,13 @@ export function PublishDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-4">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer mr-auto">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mr-auto">
+            <Switch
               checked={includeCredit}
-              onChange={(e) => setIncludeCredit(e.target.checked)}
-              className="rounded border-muted-foreground"
+              onCheckedChange={setIncludeCredit}
             />
             Credit Ghostr
-          </label>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

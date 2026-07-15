@@ -10,6 +10,7 @@ import { ImageUploadButton } from '@/components/common/ImageUploadButton'
 import { ImageThumbnailGrid } from '@/components/common/ImageThumbnailGrid'
 import { LinkPreviewGrid } from '@/components/common/LinkPreviewGrid'
 import { ShortNoteLengthWarning } from '@/components/common/ShortNoteLengthWarning'
+import { Switch } from '@/components/ui/switch'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -620,16 +621,14 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 : 'Short notes (kind 1) are like tweets - brief updates and thoughts.'}
             </p>
             <div className="pt-2 border-t">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2 text-sm">
+                <Switch
                   checked={includeCredit}
-                  onChange={(e) => setIncludeCredit(e.target.checked)}
-                  className="rounded border-muted-foreground"
+                  onCheckedChange={setIncludeCredit}
                 />
                 <span>Credit Ghostr</span>
-              </label>
-              <p className="text-xs text-muted-foreground mt-1 ml-6">
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
                 Add "via Ghostr" tag to posted event
               </p>
             </div>
