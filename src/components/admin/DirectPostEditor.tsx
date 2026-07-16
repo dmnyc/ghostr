@@ -506,7 +506,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
-        <div className="rounded-lg border p-4 space-y-4">
+        <div className="rounded-lg border velvet bg-card p-4 space-y-4">
           {isLongForm && (
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -544,7 +544,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="content">Content</Label>
+              <Label htmlFor="content" className="font-display">Content</Label>
               {!isLongForm && <ImageUploadButton onUpload={handleImageUpload} />}
             </div>
             {isLongForm ? (
@@ -589,9 +589,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border p-4 space-y-4">
+          <div className="rounded-lg border velvet bg-card p-4 space-y-4">
             <h3 className="font-medium">Post Type</h3>
-            <div className="flex items-center bg-muted rounded-full p-1">
+            <div className="flex items-center bg-primary/15 rounded-full p-1">
               <button
                 onClick={() => setIsLongForm(false)}
                 className={cn(

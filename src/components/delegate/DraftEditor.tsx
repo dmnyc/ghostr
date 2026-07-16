@@ -613,7 +613,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
-        <div className="rounded-lg border p-4 space-y-4">
+        <div className="rounded-lg border velvet bg-card p-4 space-y-4">
           {isLongForm && (
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -654,7 +654,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="content">Content</Label>
+              <Label htmlFor="content" className="font-display">Content</Label>
               {!isLongForm && !isSubmittedOrPublished && (
                 <ImageUploadButton onUpload={handleImageUpload} />
               )}
@@ -708,7 +708,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
 
         <div className="space-y-4">
           {/* Publisher Selection */}
-          <div className="rounded-lg border p-4 space-y-3">
+          <div className="rounded-lg border velvet bg-card p-4 space-y-3">
             <h3 className="font-medium">Publisher</h3>
             {selectedPublisher ? (
               <div className="flex items-center gap-3 p-2 rounded-md bg-muted/30">
@@ -824,9 +824,9 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           </div>
 
           {/* Post Type */}
-          <div className="rounded-lg border p-4 space-y-4">
+          <div className="rounded-lg border velvet bg-card p-4 space-y-4">
             <h3 className="font-medium">Post Type</h3>
-            <div className="flex items-center bg-muted rounded-full p-1">
+            <div className="flex items-center bg-primary/15 rounded-full p-1">
               <button
                 onClick={() => handleKindChange(false)}
                 disabled={isSubmittedOrPublished}
@@ -862,7 +862,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           </div>
 
           {draft.status === "submitted" && !draft.publishedEventId && (
-            <div className="rounded-lg border p-4">
+            <div className="rounded-lg border velvet bg-card p-4">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500">
                 <Check className="h-4 w-4" />
                 <span className="font-medium">Submitted</span>
@@ -871,7 +871,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
           )}
 
           {draft.publishedEventId && (
-            <div className="rounded-lg border p-4 space-y-2">
+            <div className="rounded-lg border velvet bg-card p-4 space-y-2">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500">
                 <Check className="h-4 w-4" />
                 <span className="font-medium">Published</span>

@@ -169,16 +169,16 @@ export function Header() {
       {/* Centered role switcher */}
       {isAuthenticated && (
         <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center">
-          <div className="pointer-events-auto flex items-center rounded-full bg-muted p-1">
+          <div className="pointer-events-auto flex items-center rounded-full bg-primary/15 p-1">
             <button
               onClick={() => {
                 setActiveRole('delegate')
                 navigate('/dashboard')
               }}
               className={cn(
-                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 sm:py-2 sm:text-base',
+                'rounded-full px-3 py-1.5 text-sm font-semibold transition-all sm:px-4 sm:py-2 sm:text-base',
                 activeRole === 'delegate'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-primary btn-gradient text-primary-foreground shadow-glow'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -190,9 +190,9 @@ export function Header() {
                 navigate('/dashboard')
               }}
               className={cn(
-                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 sm:py-2 sm:text-base',
+                'rounded-full px-3 py-1.5 text-sm font-semibold transition-all sm:px-4 sm:py-2 sm:text-base',
                 activeRole === 'admin'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-primary btn-gradient text-primary-foreground shadow-glow'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
