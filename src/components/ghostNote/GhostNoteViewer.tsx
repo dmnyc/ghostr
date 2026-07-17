@@ -18,6 +18,8 @@ import {
 import { fetchProfile, getDisplayName } from '@/services/profileSearchService'
 import { toast } from '@/hooks/useToast'
 import type { GhostNote } from '@/types/ghostNote'
+import { PaymentGate } from '@/components/lightning/PaymentGate'
+import { hasPaymentProof } from '@/lib/lightning/paymentVerifier'
 import { v4 as uuidv4 } from 'uuid'
 
 export function GhostNoteViewer() {
@@ -35,6 +37,7 @@ export function GhostNoteViewer() {
   const [decryptedMessage, setDecryptedMessage] = useState<string | null>(null)
   const [copiedContent, setCopiedContent] = useState(false)
   const [viewTimer, setViewTimer] = useState<number>(0)
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
 
   const VIEW_TIMEOUT_SECONDS = 60
 
@@ -107,6 +110,15 @@ export function GhostNoteViewer() {
         return
       }
 
+      // Extract Lightning payment fields
+      const priceTag = event.tags.find((t: string[]) => t[0] === 'price')
+      const bolt11Tag = event.tags.find((t: string[]) => t[0] === 'bolt11')
+      const paymentHashTag = event.tags.find((t: string[]) => t[0] === 'payment_hash')
+
+      const priceSats = priceTag ? parseInt(priceTag[1] || '') : undefined
+      const bolt11 = bolt11Tag?.[1]
+      const paymentHash = paymentHashTag?.[1]
+
       // Create ghost note object
       const note: GhostNote = {
         id: uuidv4(),
@@ -124,6 +136,9 @@ export function GhostNoteViewer() {
         revokedAt: null,
         relayUrls: [],
         notificationEnabled: false,
+        priceSats,
+        bolt11,
+        paymentHash,
       }
 
       // Add to store
@@ -352,7 +367,16 @@ export function GhostNoteViewer() {
             </div>
           </div>
 
-          {!decryptedMessage ? (
+          {/* Payment gate for paid Ghost Notes */}
+          {!decryptedMessage && ghostNote.priceSats && ghostNote.bolt11 && ghostNote.paymentHash && !paymentConfirmed && !hasPaymentProof(ghostNote.dTag) ? (
+            <PaymentGate
+              ghostNoteDTag={ghostNote.dTag}
+              amountSats={ghostNote.priceSats}
+              bolt11={ghostNote.bolt11}
+              paymentHash={ghostNote.paymentHash}
+              onPaymentConfirmed={() => setPaymentConfirmed(true)}
+            />
+          ) : !decryptedMessage ? (
             // Pre-decrypt view
             <>
               {isExpired ? (

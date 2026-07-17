@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Send, Loader2, Copy, Check, X } from 'lucide-react'
+import { Send, Loader2, Copy, Check, X, Zap } from 'lucide-react'
 import { GhostNoteIcon } from '@/components/common/GhostNoteIcon'
 import {
   Dialog,
@@ -23,9 +23,11 @@ import {
   type SearchProfile,
 } from '@/services/profileSearchService'
 import { toast } from '@/hooks/useToast'
+import { useWalletStore } from '@/stores/walletStore'
 import { EXPIRATION_OPTIONS, DEFAULT_EXPIRATION_SECONDS } from '@/types/ghostNote'
 
 const MAX_CONTENT_LENGTH = 500
+const MAX_PAID_CONTENT_LENGTH = 10000
 
 interface GhostNoteComposeProps {
   open: boolean
@@ -40,6 +42,7 @@ export function GhostNoteCompose({
 }: GhostNoteComposeProps) {
   const { user } = useAuthStore()
   const { addGhostNote, settings } = useGhostNoteStore()
+  const walletStatus = useWalletStore((s) => s.status)
 
   const [recipientNpub, setRecipientNpub] = useState('')
   const [selectedProfile, setSelectedProfile] = useState<SearchProfile | null>(
@@ -50,6 +53,8 @@ export function GhostNoteCompose({
     settings.defaultExpiration || DEFAULT_EXPIRATION_SECONDS
   )
   const [isSending, setIsSending] = useState(false)
+  const [isPaid, setIsPaid] = useState(false)
+  const [priceSats, setPriceSats] = useState('')
 
   // Success state
   const [showSuccess, setShowSuccess] = useState(false)
@@ -64,6 +69,8 @@ export function GhostNoteCompose({
       setShowSuccess(false)
       setSuccessLink('')
       setCopiedLink(false)
+      setIsPaid(false)
+      setPriceSats('')
 
       if (initialRecipient) {
         setSelectedProfile(initialRecipient)
@@ -122,11 +129,14 @@ export function GhostNoteCompose({
         throw new Error('Invalid recipient')
       }
 
+      const price = isPaid && priceSats ? parseInt(priceSats) : undefined
+
       const result = await createGhostNote({
         recipientPubkey,
         content: content.trim(),
         expirationSeconds,
         notifyOnRead: true, // Always notify sender when read
+        priceSats: price && price > 0 ? price : undefined,
       })
 
       if (result.success && result.ghostNote) {
@@ -187,7 +197,8 @@ export function GhostNoteCompose({
     return option?.label || `${Math.floor(seconds / 3600)} hours`
   }
 
-  const remainingChars = MAX_CONTENT_LENGTH - content.length
+  const maxLength = isPaid ? MAX_PAID_CONTENT_LENGTH : MAX_CONTENT_LENGTH
+  const remainingChars = maxLength - content.length
   const isOverLimit = remainingChars < 0
 
   // Success view
@@ -326,7 +337,7 @@ export function GhostNoteCompose({
               placeholder="Type your secret message..."
               rows={4}
               className="resize-none"
-              maxLength={MAX_CONTENT_LENGTH + 50} // Allow some overage for visual feedback
+              maxLength={maxLength + 50} // Allow some overage for visual feedback
             />
           </div>
 
@@ -358,6 +369,50 @@ export function GhostNoteCompose({
                 </div>
               ))}
             </RadioGroup>
+          </div>
+
+          {/* Lightning Payment Option */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                Require Payment
+              </Label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPaid}
+                  onChange={(e) => setIsPaid(e.target.checked)}
+                  className="sr-only peer"
+                  disabled={walletStatus !== 'connected'}
+                />
+                <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-yellow-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+            {walletStatus !== 'connected' && (
+              <p className="text-xs text-muted-foreground">
+                Set up your Lightning wallet in Settings to enable paid Ghost Notes
+              </p>
+            )}
+            {isPaid && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={priceSats}
+                    onChange={(e) => setPriceSats(e.target.value)}
+                    placeholder="Amount in sats"
+                    min="1"
+                    max="1000000"
+                    className="flex-1 px-3 py-2 text-sm rounded-md border bg-background"
+                  />
+                  <span className="text-sm text-muted-foreground">sats</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Payment goes directly to your self-custodial Spark wallet. No limit on message length for paid notes.
+                </p>
+              </div>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">

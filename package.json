@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@breeztech/breez-sdk-spark": "^0.1.0",
     "@nostr-dev-kit/ndk": "^2.18.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
