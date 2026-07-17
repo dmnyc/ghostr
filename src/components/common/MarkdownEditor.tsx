@@ -526,7 +526,7 @@ export function MarkdownEditor({
           />
 
           {/* Toolbar */}
-          <div className="flex gap-1 p-2 border-b bg-muted/30">
+          <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/30">
             <Button
               type="button"
               variant="ghost"
