@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -168,6 +169,7 @@ function App() {
       />
       <WhatsNewDialog />
       <Toaster />
+      <Analytics />
     </div>
   )
 }
