@@ -265,7 +265,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           {/* Title field for long-form articles */}
           {submission.kind === 30023 && (
             <div className="space-y-2">
-              <Label htmlFor="title">Title {!isProcessed && "(Editable)"}</Label>
+              <Label htmlFor="title" className="font-display">Title {!isProcessed && "(Editable)"}</Label>
               <Input
                 id="title"
                 value={editedTitle}
@@ -279,7 +279,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
           {/* Summary field for long-form articles */}
           {submission.kind === 30023 && (
             <div className="space-y-2">
-              <Label htmlFor="summary">Summary (optional) {!isProcessed && "(Editable)"}</Label>
+              <Label htmlFor="summary" className="font-display">Summary (optional) {!isProcessed && "(Editable)"}</Label>
               <Input
                 id="summary"
                 value={editedSummary}
@@ -310,7 +310,7 @@ export function ReviewPane({ onBack }: ReviewPaneProps) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Content {!isProcessed && "(Editable)"}</Label>
+              <Label className="font-display">Content {!isProcessed && "(Editable)"}</Label>
               {submission.kind === 1 && !isProcessed && (
                 <ImageUploadButton onUpload={handleImageUpload} />
               )}

@@ -573,7 +573,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     }
 
     return (
-      <div className={cn("rounded-lg border overflow-hidden max-w-full", className)}>
+      <div className={cn("rounded-lg border velvet bg-card overflow-hidden max-w-full", className)}>
         <div className="flex border-b bg-muted/30">
           <button
             type="button"
@@ -615,7 +615,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
           onFocus={() => { hasUserInteracted.current = true }}
           contentEditable={!disabled}
           className={cn(
-            'relative p-3 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'relative p-3 bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
             'whitespace-pre-wrap break-words max-w-full overflow-x-auto',
             disabled && 'opacity-50 cursor-not-allowed'
           )}

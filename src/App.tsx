@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { initializeTheme } from '@/stores/settingsStore'
 import { Header } from '@/components/layout/Header'
+import { Button } from '@/components/ui/button'
 import { GhostrLogo } from '@/components/common/GhostrLogo'
 import { Footer } from '@/components/layout/Footer'
 import { DelegateDashboard } from '@/components/delegate/DelegateDashboard'
@@ -28,12 +29,9 @@ function LandingPage() {
         A decentralized content delegation workflow for Nostr.
         Writers draft, publishers sign. No scary key sharing required.
       </p>
-      <button
-        onClick={() => setLoginModalOpen(true)}
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-      >
+      <Button size="lg" onClick={() => setLoginModalOpen(true)}>
         Login to Get Started
-      </button>
+      </Button>
     </div>
   )
 }
@@ -90,7 +88,7 @@ function App() {
   }, [isAuthenticated, setWhatsNewOpen])
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <Header />
 
       <main className="container mx-auto px-4 py-6 flex-1">

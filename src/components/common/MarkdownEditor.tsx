@@ -484,7 +484,7 @@ export function MarkdownEditor({
   const renderPreview = () => renderMarkdownRich(value, resolveName);
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden max-w-full", className)}>
+    <div className={cn("rounded-lg border velvet bg-card overflow-hidden max-w-full", className)}>
       {/* Tabs */}
       <div className="flex border-b bg-muted/30">
         <button
@@ -526,7 +526,7 @@ export function MarkdownEditor({
           />
 
           {/* Toolbar */}
-          <div className="flex gap-1 p-2 border-b bg-muted/30">
+          <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/30">
             <Button
               type="button"
               variant="ghost"

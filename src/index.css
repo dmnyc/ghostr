@@ -5,6 +5,19 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 
+  /* Typography */
+  --font-sans: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+
+  /* Elevation: a top-edge sheen (inset highlight) + soft drop. Overrides
+     Tailwind's shadow scale so every surface gains depth automatically. */
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.30);
+  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 28px rgba(0, 0, 0, 0.35);
+  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 20px 50px rgba(0, 0, 0, 0.42);
+  --shadow-glow: 0 0 0 1px hsl(var(--primary) / 0.25), 0 8px 24px hsl(var(--primary) / 0.20);
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -25,6 +38,7 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
+  --color-lavender: hsl(var(--lavender));
 }
 
 :root {
@@ -47,29 +61,31 @@
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
   --ring: 262.1 83.3% 57.8%;
+  --lavender: 255 60% 55%;
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 263.4 70% 50.4%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 263.4 70% 50.4%;
+  --background: 250 16% 4%;
+  --foreground: 250 25% 94%;
+  --card: 250 14% 11%;
+  --card-foreground: 250 25% 94%;
+  --popover: 250 14% 14%;
+  --popover-foreground: 250 25% 94%;
+  --primary: 252 100% 77%;
+  --primary-foreground: 255 45% 8%;
+  --secondary: 250 14% 10%;
+  --secondary-foreground: 250 25% 94%;
+  --muted: 250 14% 10%;
+  --muted-foreground: 250 14% 64%;
+  --accent: 250 16% 15%;
+  --accent-foreground: 250 25% 94%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 250 30% 96%;
+  --border: 255 22% 22%;
+  --input: 250 14% 7%;
+  --ring: 252 100% 77%;
+  --lavender: 252 100% 85%;
 }
 
 * {
@@ -79,6 +95,58 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Light-mode backdrop: a thin diamond-outline lattice (overridden in .dark by
+     the filled checker). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath fill='none' stroke='%237c3aed' stroke-opacity='0.08' d='M24 0 48 24 24 48 0 24Z'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* Display serif on prominent headings. The pixel "Press Start 2P" stays on the
+   wordmark only — everything else is classy type. */
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+/* Dark "manor" backdrop: a charcoal damask lattice + two violet radial glows +
+   a diagonal velvet fade. Fixed so it floats behind scrolling content. */
+.dark body {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath fill='%23b9a6ff' fill-opacity='0.045' d='M24 0 48 24 24 48 0 24Z'/%3E%3C/svg%3E"),
+    radial-gradient(1000px 460px at 50% -10%, hsl(252 100% 77% / 0.10), transparent 60%),
+    radial-gradient(820px 560px at 110% 110%, hsl(270 80% 55% / 0.08), transparent 55%),
+    linear-gradient(165deg, hsl(250 14% 7%), hsl(var(--background)) 62%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed;
+}
+
+/* Velvet surface fills — apply via the `velvet` / `velvet-raised` utilities.
+   Both stops are lifted surface tones (never the page ground), so panels stay
+   fully opaque and read as solid surfaces rather than dissolving into the bg. */
+@utility velvet {
+  background-image: linear-gradient(160deg, hsl(var(--popover)), hsl(var(--card)));
+}
+@utility velvet-raised {
+  background-image: linear-gradient(160deg, hsl(var(--accent)), hsl(var(--popover)));
+}
+@utility btn-gradient {
+  background-image: linear-gradient(180deg, hsl(var(--primary)), color-mix(in srgb, hsl(var(--primary)), black 16%));
+}
+
+/* Velvet scrollbar */
+.dark ::-webkit-scrollbar { width: 12px; height: 12px; }
+.dark ::-webkit-scrollbar-track { background: transparent; }
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(var(--accent)), hsl(var(--card)));
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.45), hsl(var(--accent)));
+  background-clip: padding-box;
 }
 
 /* Prose styles for markdown preview */

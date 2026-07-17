@@ -89,8 +89,8 @@ export function PublisherDashboard() {
             Review and publish content submitted by delegates
           </p>
         </div>
-        <Button onClick={() => setIsCreatingPost(true)} className="self-start sm:self-auto">
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setIsCreatingPost(true)} className="self-start h-12 px-7 text-lg sm:self-auto">
+          <Plus className="mr-2 h-5 w-5" />
           New Post
         </Button>
       </div>

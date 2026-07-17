@@ -18,6 +18,17 @@ export interface ReleaseNote {
  */
 export const releaseNotes: ReleaseNote[] = [
   {
+    version: '0.9.0',
+    date: 'July 17, 2026',
+    highlights: [
+      'Modern Noir visual refresh — satin dark palette, velvet gradient surfaces, diamond-checker background',
+      'Fraunces display + Geist UI typography (Press Start 2P stays on the wordmark)',
+      'Layered elevation with sheen + drop shadows for real depth and dimensionality',
+      'Recomposed editor layout — sticky right rail, aligned columns, mobile-optimized action buttons',
+      'Stronger primary action buttons with violet gradient + glow',
+    ],
+  },
+  {
     version: '0.8.2',
     date: 'July 15, 2026',
     highlights: [
