@@ -23,6 +23,7 @@ import { extractImageUrls } from '@/lib/blossom'
 import { extractLinkUrls, fetchLinkMetadata, type LinkMetadata } from '@/lib/urlUtils'
 import { cn } from '@/lib/utils/cn'
 import { hasThreadMarker, joinThreadPosts, splitThreadPosts } from '@/lib/threadUtils'
+import { getNoteUrl } from '@/lib/nostrClients'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,9 @@ interface DirectPostEditorProps {
 export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps) {
   const { ndk } = useNDKStore()
   const { signer } = useAuthStore()
-  const { creditGhostr } = useSettingsStore()
+  const { creditGhostr ,
+    noteViewerClient,
+  } = useSettingsStore()
   const { addItem } = usePublishHistoryStore()
   const { currentDraftId, drafts, updateDraft, createDraft, setCurrentDraft, deleteDraft } = usePublisherDraftStore()
 
@@ -614,6 +617,10 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
       toast({
         title: 'Published!',
         description: 'Your post has been published to Nostr.',
+        action: event?.id ? {
+          label: 'View post',
+          onClick: () => window.open(getNoteUrl(event.id, noteViewerClient), '_blank'),
+        } : undefined,
       })
 
       // Update draft status if publishing from a draft

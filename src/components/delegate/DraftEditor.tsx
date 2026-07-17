@@ -56,6 +56,8 @@ import { extractImageUrls } from "@/lib/blossom";
 import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
 import { cn } from "@/lib/utils/cn";
 import { hasThreadMarker, joinThreadPosts, splitThreadPosts, stripThreadMarker } from "@/lib/threadUtils";
+import { getNoteUrl } from '@/lib/nostrClients'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 interface DraftEditorProps {
   onBack: () => void;
@@ -64,6 +66,7 @@ interface DraftEditorProps {
 export function DraftEditor({ onBack }: DraftEditorProps) {
   const { currentDraftId, drafts, updateDraft, saveDraft, deleteDraft, isSaving } =
     useDraftStore();
+  const { noteViewerClient } = useSettingsStore();
   const {
     favorites,
     loadFavorites,
@@ -735,7 +738,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               variant="outline"
               onClick={() =>
                 window.open(
-                  `https://jumble.social/notes/${draft.publishedEventId}`,
+                  getNoteUrl(draft.publishedEventId!, noteViewerClient),
                   "_blank",
                 )
               }
@@ -1149,7 +1152,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 <span className="font-medium">Published</span>
               </div>
               <a
-                href={`https://jumble.social/notes/${draft.publishedEventId}`}
+                href={getNoteUrl(draft.publishedEventId!, noteViewerClient)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-xs font-mono break-all bg-muted/30 p-2 rounded hover:bg-muted transition-colors"

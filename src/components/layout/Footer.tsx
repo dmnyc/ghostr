@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { Github, Zap, User, Sparkles } from 'lucide-react'
 import packageJson from '../../../package.json'
 import { useUIStore } from '@/stores/uiStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { getProfileUrl } from '@/lib/nostrClients'
 
 export function Footer() {
   const setWhatsNewOpen = useUIStore((s) => s.setWhatsNewOpen)
+  const { noteViewerClient } = useSettingsStore()
   const [zapModal, setZapModal] = useState({
     show: false,
     lightningAddress: 'ghostr@breez.tips',
@@ -40,7 +43,7 @@ export function Footer() {
   }
 
   const zapOnNostr = () => {
-    window.open(`https://jumble.social/users/${creatorNpub}`, '_blank')
+    window.open(getProfileUrl(creatorNpub, noteViewerClient), '_blank')
   }
 
   return (
@@ -58,7 +61,7 @@ export function Footer() {
             <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
               <div className="flex gap-2">
                 <a
-                href={`https://jumble.social/users/${creatorNpub}`}
+                href={getProfileUrl(creatorNpub, noteViewerClient)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs px-3 py-1.5 rounded-full transition-colors inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"

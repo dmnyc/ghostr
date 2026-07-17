@@ -28,6 +28,8 @@ import {
 } from "@/services/profileSearchService";
 import { nip19 } from "nostr-tools";
 import { useAuthStore } from "@/stores/authStore";
+import { getNoteUrl } from '@/lib/nostrClients'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 interface HistoryListProps {
   onEditArticle?: (item: PublishedItem) => void;
@@ -144,6 +146,7 @@ interface HistoryItemProps {
 }
 
 function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
+  const { noteViewerClient } = useSettingsStore();
   const [delegateProfile, setDelegateProfile] = useState<SearchProfile | null>(
     null,
   );
@@ -230,7 +233,7 @@ function HistoryItem({ item, onDelete, onEdit }: HistoryItemProps) {
           </Button>
         )}
         <a
-          href={`https://jumble.social/notes/${getNostrIdentifier(item)}`}
+          href={getNoteUrl(getNostrIdentifier(item), noteViewerClient)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-accent"

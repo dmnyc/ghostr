@@ -4,8 +4,11 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useDraftStore } from "@/stores/draftStore";
 import type { Draft } from "@/types/draft";
+import { getNoteUrl } from '@/lib/nostrClients'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 export function DelegateHistoryList() {
+  const { noteViewerClient } = useSettingsStore()
   const { drafts, setCurrentDraft, deleteDraft } = useDraftStore();
 
   const publishedDrafts = drafts.filter((d) => d.status === "published" && !d.archived);
@@ -79,7 +82,7 @@ export function DelegateHistoryList() {
                 className="h-8 w-8"
                 onClick={() =>
                   window.open(
-                    `https://jumble.social/notes/${draft.publishedEventId}`,
+                    getNoteUrl(draft.publishedEventId!, noteViewerClient),
                     "_blank",
                   )
                 }

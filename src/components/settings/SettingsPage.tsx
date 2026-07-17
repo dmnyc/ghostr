@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { NOTE_CLIENTS } from '@/lib/nostrClients'
 import { useNDKStore } from '@/stores/ndkStore'
 import { useAuthStore } from '@/stores/authStore'
 import { isBotEnabled, getBotPubkey } from '@/lib/ndk/botSigner'
@@ -27,6 +28,8 @@ export function SettingsPage() {
     setCreditGhostr,
     enableBotNotifications,
     setBotNotifications,
+    noteViewerClient,
+    setNoteViewerClient,
     relays,
     addRelay,
     removeRelay,
@@ -210,6 +213,28 @@ export function SettingsPage() {
               checked={creditGhostr}
               onCheckedChange={setCreditGhostr}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Post Links */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Post Links</CardTitle>
+          <CardDescription>Choose which Nostr client opens when you view a published post</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <Label>Open notes in</Label>
+            <select
+              value={noteViewerClient}
+              onChange={(e) => setNoteViewerClient(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {NOTE_CLIENTS.map((client) => (
+                <option key={client.key} value={client.key}>{client.label}</option>
+              ))}
+            </select>
           </div>
         </CardContent>
       </Card>
