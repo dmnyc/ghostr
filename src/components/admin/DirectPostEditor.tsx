@@ -446,67 +446,72 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
 
         <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
           {currentDraftId && lastRelaySave && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Saved to relays</span>
             </div>
           )}
-          {currentDraftId && (
-            <>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-                className="gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Save
-              </Button>
-            </>
-          )}
-          {!currentDraftId && (content.trim() || title.trim()) && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                const draft = createDraft(isLongForm ? 30023 : 1)
-                initializedDraftId.current = draft.id
-                setHasChanges(false)
-                toast({
-                  title: 'Draft saved',
-                  description: 'Your work has been saved as a draft.',
-                })
-              }}
-              disabled={isPublishing}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Save as Draft
-            </Button>
-          )}
-          <Button onClick={handlePublish} disabled={isPublishing}>
-            {isPublishing ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-2 h-4 w-4" />
-            )}
-            {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
-          </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
-        <div className="rounded-lg border velvet bg-card p-4 space-y-4">
+        <div className="space-y-4">
+          {(currentDraftId || (content.trim() || title.trim())) && (
+            <div className="flex items-center justify-end gap-2">
+            {currentDraftId && (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+                <Button variant="outline" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Save
+                </Button>
+              </>
+            )}
+            {!currentDraftId && (content.trim() || title.trim()) && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const draft = createDraft(isLongForm ? 30023 : 1)
+                  initializedDraftId.current = draft.id
+                  setHasChanges(false)
+                  toast({
+                    title: 'Draft saved',
+                    description: 'Your work has been saved as a draft.',
+                  })
+                }}
+                disabled={isPublishing}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Save as Draft
+              </Button>
+            )}
+            <Button
+              className="flex-1 md:hidden"
+              onClick={handlePublish}
+              disabled={isPublishing}
+            >
+              {isPublishing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
+            </Button>
+            </div>
+          )}
+          <div className="rounded-lg border velvet bg-card p-4 space-y-4">
           {isLongForm && (
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -587,8 +592,17 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             </p>
           </div>
         </div>
+        </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 md:sticky md:top-6">
+          <Button className="hidden w-full md:flex" onClick={handlePublish} disabled={isPublishing}>
+            {isPublishing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
+          </Button>
           <div className="rounded-lg border velvet bg-card p-4 space-y-4">
             <h3 className="font-medium">Post Type</h3>
             <div className="flex items-center bg-primary/15 rounded-full p-1">

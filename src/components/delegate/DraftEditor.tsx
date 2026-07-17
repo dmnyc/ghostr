@@ -567,13 +567,20 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               View on Nostr
             </Button>
           ) : (
-            <>
-              {draft.status === 'draft' && lastRelaySave && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-2">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Saved to relays</span>
-                </div>
-              )}
+            draft.status === 'draft' && lastRelaySave && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Saved to relays</span>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
+        <div className="space-y-4">
+          {!isPublished && (
+            <div className="flex items-center justify-end gap-2">
               {draft.status === 'draft' && (
                 <Button
                   variant="destructive"
@@ -598,22 +605,17 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 Save
               </Button>
               <Button
+                className="flex-1 md:hidden"
                 onClick={handleSubmitForReview}
                 disabled={isSubmittedOrPublished || !selectedPublisher}
-                title={
-                  !selectedPublisher ? "Select a publisher first" : undefined
-                }
+                title={!selectedPublisher ? "Select a publisher first" : undefined}
               >
                 <Send className="mr-2 h-4 w-4" />
                 Submit for Review
               </Button>
-            </>
+            </div>
           )}
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-[1fr_300px] items-start">
-        <div className="rounded-lg border velvet bg-card p-4 space-y-4">
+          <div className="rounded-lg border velvet bg-card p-4 space-y-4">
           {isLongForm && (
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -705,8 +707,23 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
             </p>
           </div>
         </div>
+        </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 md:sticky md:top-6">
+          {!isPublished && (
+            <Button
+              className="hidden w-full md:flex"
+              onClick={handleSubmitForReview}
+              disabled={isSubmittedOrPublished || !selectedPublisher}
+              title={
+                !selectedPublisher ? "Select a publisher first" : undefined
+              }
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Submit for Review
+            </Button>
+          )}
+
           {/* Publisher Selection */}
           <div className="rounded-lg border velvet bg-card p-4 space-y-3">
             <h3 className="font-medium">Publisher</h3>
