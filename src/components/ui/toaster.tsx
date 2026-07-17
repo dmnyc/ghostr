@@ -20,7 +20,7 @@ export function Toaster() {
               <div className="font-semibold">{toast.title}</div>
             )}
             {toast.description && (
-              <div className="text-sm text-muted-foreground">{toast.description}</div>
+              <div className={cn("text-sm", toast.variant === 'destructive' ? "text-destructive-foreground/80" : "text-muted-foreground")}>{toast.description}</div>
             )}
           </div>
           <button

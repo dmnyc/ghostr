@@ -424,7 +424,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   }
 
   const handlePublish = async () => {
-    if (!content.trim()) {
+    if (!content.trim() && !(isThread && threadPosts.some(p => p.trim()))) {
       toast({
         title: 'Cannot publish',
         description: 'Please add some content before publishing.',
