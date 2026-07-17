@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ghostr — Design Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Sora:wght@400;500;600;700&family=Cinzel:wght@500;600;700&family=Outfit:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Geist:wght@400;500;600;700&family=Silkscreen&family=DotGothic16&family=VT323&family=Jacquard+24&family=Jacquarda+Bastarda+9&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #050507; color: #eee; font-family: system-ui, sans-serif; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(10px);
+    background: rgba(8,8,12,0.7);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 14px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .topbar h1 { font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: #aaa; font-weight: 600; }
+  .topbar .hint { font-size: 13px; color: #777; }
+  .topbar a { color: #b9a6ff; font-size: 13px; }
+
+  .option {
+    position: relative;
+    padding: 64px 24px 80px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden;
+  }
+  .damask { position: absolute; inset: 0; z-index: 0; }
+  .damask svg { width: 100%; height: 100%; display: block; }
+  .glow-a { background: radial-gradient(900px 420px at 50% -8%, var(--primary), transparent 60%); position: absolute; inset: 0; z-index: 0; opacity: 0.5; }
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--lav); font-weight: 600;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--surface-2);
+  }
+  .display { font-family: var(--df); color: var(--text); margin: 18px 0 8px; line-height: 1.05; }
+  .display.h1 { font-size: 52px; font-weight: 600; }
+  .lede { font-family: var(--uf); color: var(--muted); font-size: 16px; max-width: 56ch; line-height: 1.6; }
+  .fonts { font-family: var(--uf); font-size: 13px; color: var(--faint); margin-top: 10px; }
+  .fonts b { color: var(--lav); font-weight: 600; }
+
+  .stage {
+    margin-top: 34px;
+    display: grid; grid-template-columns: 1fr; gap: 16px;
+  }
+  .card {
+    border-radius: var(--r);
+    border: 1px solid var(--hairline);
+    background: linear-gradient(160deg, var(--surface-2) 0%, var(--surface-1) 130%);
+    padding: 20px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 34px rgba(0,0,0,0.45);
+  }
+  .card h3 { font-family: var(--df); font-weight: 600; font-size: 22px; color: var(--text); }
+  .card .meta { font-family: var(--uf); font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .card p { font-family: var(--uf); font-size: 14px; color: var(--text-dim); margin-top: 12px; line-height: 1.6; }
+  .pillrow { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .badge { font-family: var(--uf); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .badge.purple { background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--lav); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); }
+  .badge.ghost { background: var(--surface-3); color: var(--muted); border: 1px solid var(--hairline); }
+
+  .controls { display: flex; gap: 12px; align-items: center; margin-top: 22px; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--uf); font-size: 14px; font-weight: 600;
+    padding: 11px 18px; border-radius: 10px; border: none; cursor: pointer;
+    transition: transform .12s, box-shadow .15s, filter .15s;
+  }
+  .btn-primary {
+    color: #fff;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 92%, white 8%), var(--primary) 58%, color-mix(in srgb, var(--primary) 80%, black 20%));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 22px color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.06); }
+  .btn-ghost {
+    color: var(--text); background: var(--surface-3);
+    border: 1px solid var(--hairline);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .btn-ghost:hover { border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 220px; }
+  .field label { font-family: var(--uf); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+  .input {
+    font-family: var(--uf); font-size: 14px; color: var(--text);
+    background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.15));
+    border: 1px solid var(--hairline); border-radius: 10px; padding: 11px 13px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .input:focus { outline: none; border-color: color-mix(in srgb, var(--primary) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+
+  .row { display: flex; gap: 14px; align-items: center; }
+  .switch { width: 42px; height: 24px; border-radius: 999px; background: var(--primary); position: relative; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent); }
+  .switch::after { content:''; position:absolute; top:3px; left:21px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .switch-label { font-family: var(--uf); font-size: 14px; color: var(--text-dim); }
+
+  .caption { font-family: var(--uf); font-size: 12px; color: var(--faint); margin-top: 30px; text-align:center; }
+  .caption b { color: var(--lav); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>👻 Ghostr · Design Directions</h1>
+  <span class="hint">A–C are pure-classy; D–F blend the 8-bit logo DNA with Nocturne. Tell me which.</span>
+  <a href="#a">A</a> · <a href="#b">B</a> · <a href="#c">C</a> · <a href="#d">D</a> · <a href="#e">E</a> · <a href="#f">F</a> · <a href="#g">G</a> · <a href="#h">H</a> · <a href="#i">I</a>
+</div>
+
+<!-- ============================ OPTION A — Nocturne ============================ -->
+<section class="option" id="a" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Cormorant Garamond', Georgia, serif; --uf:'Sora', system-ui, sans-serif;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="tag">Option A</span>
+    <h2 class="display h1">Nocturne</h2>
+    <p class="lede">Elegant, high-contrast, a touch haunted. A whisper of violet over charcoal damask — soft depth, refined serif headings.</p>
+    <p class="fonts">Display <b>Cormorant Garamond</b> · UI <b>Sora</b></p>
+
+    <div class="stage">
+      <div class="card">
+        <h3>A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever. This card lifts gently off the damask.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">A — <b>Cormorant Garamond + Sora</b>, amethyst <b>#9B6BFF</b> on charcoal.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION B — Engraved ============================ -->
+<section class="option" id="b" style="
+  --bg:#08080A; --surface-1:#0C0C10; --surface-2:#141419; --surface-3:#1B1B22;
+  --text:#F3F1F8; --text-dim:#CFCCD8; --muted:#89879A; --faint:#56556A;
+  --hairline:rgba(124,92,255,0.16);
+  --primary:#7C5CFF; --lav:#A78BFF;
+  --df:'Cinzel', Georgia, serif; --uf:'Outfit', system-ui, sans-serif;
+  --r:12px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="tag">Option B</span>
+    <h2 class="display h1" style="letter-spacing:0.02em">ENGRAVED</h2>
+    <p class="lede">Opulent and bold. Engraved Roman capitals, a deeper royal violet, heavier damask — luxury manor, statement gravitas.</p>
+    <p class="fonts">Display <b>Cinzel</b> (all-caps) · UI <b>Outfit</b></p>
+
+    <div class="stage">
+      <div class="card">
+        <h3>A DRAFT, APPROVED.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever. This card lifts gently off the damask.</p>
+        <div class="pillrow">
+          <span class="badge purple">@MENTION</span>
+          <span class="badge purple">KIND 1</span>
+          <span class="badge ghost">DRAFT</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">PUBLISH</button>
+          <button class="btn btn-ghost">EDIT</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">B — <b>Cinzel + Outfit</b>, royal violet <b>#7C5CFF</b>, engraved capitals.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION C — Modern Noir ============================ -->
+<section class="option" id="c" style="
+  --bg:#0B0B0F; --surface-1:#101015; --surface-2:#181820; --surface-3:#20202A;
+  --text:#EEEDF4; --text-dim:#C7C6D4; --muted:#86859A; --faint:#58576B;
+  --hairline:rgba(167,139,255,0.15);
+  --primary:#A78BFF; --lav:#C4B4FF;
+  --df:'Fraunces', Georgia, serif; --uf:'Geist', system-ui, sans-serif;
+  --r:16px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="tag">Option C</span>
+    <h2 class="display h1" style="font-style:italic">Modern Noir</h2>
+    <p class="lede">Contemporary and crisp. A characterful modern serif with optical warmth, geometric sans UI, brighter violet accents — classy but current.</p>
+    <p class="fonts">Display <b>Fraunces</b> · UI <b>Geist</b></p>
+
+    <div class="stage">
+      <div class="card">
+        <h3>A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever. This card lifts gently off the damask.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">C — <b>Fraunces + Geist</b>, bright violet <b>#A78BFF</b>, modern serif.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION D — Arcade Eyebrows (Nocturne + pixel micro-type) ============================ -->
+<section class="option opt-pixel" id="d" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Cormorant Garamond', Georgia, serif; --uf:'Sora', system-ui, sans-serif;
+  --pf:'Silkscreen', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option D</span>
+    <h2 class="display h1">Arcade Eyebrows</h2>
+    <p class="lede">Nocturne's elegant serif headings + Sora body stay — but the 8-bit logo DNA surfaces in the micro-type: tags, badges, labels and counts render in crisp pixel (Silkscreen), echoing the Press Start 2P wordmark.</p>
+    <p class="fonts">Display <b>Cormorant Garamond</b> · UI <b>Sora</b> · Pixel micro-type <b>Silkscreen</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3>A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">D — Cormorant + Sora + <b>Silkscreen</b> pixel micro-type.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION E — Dot-Matrix (aliased display) ============================ -->
+<section class="option opt-pixel" id="e" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'DotGothic16', monospace; --uf:'Sora', system-ui, sans-serif;
+  --pf:'VT323', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option E</span>
+    <h2 class="display h1" style="font-size:46px">Dot-Matrix Manor</h2>
+    <p class="lede">Overtly 8-bit: headings render in an aliased dot-matrix face (DotGothic16) so the whole UI shares the logo's stepped, low-res texture. Body stays clean Sora; terminal-style micro-type in VT323.</p>
+    <p class="fonts">Display <b>DotGothic16</b> (aliased) · UI <b>Sora</b> · Micro-type <b>VT323</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3>A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">E — <b>DotGothic16</b> aliased display + VT323 micro-type.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION F — Carved Caps (engraved/aliased serif) ============================ -->
+<section class="option opt-pixel" id="f" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Cinzel', Georgia, serif; --uf:'Sora', system-ui, sans-serif;
+  --pf:'Silkscreen', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option F</span>
+    <h2 class="display h1" style="letter-spacing:0.03em">CARVED CAPS</h2>
+    <p class="lede">A middle path: engraved Roman capitals (Cinzel) have hard, chiseled, aliased edges — classical but digitally cut, bridging serif elegance and the logo's crispness. Pixel micro-type (Silkscreen) ties it to the wordmark.</p>
+    <p class="fonts">Display <b>Cinzel</b> (engraved caps) · UI <b>Sora</b> · Pixel micro-type <b>Silkscreen</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3 style="letter-spacing:0.02em">A DRAFT, APPROVED.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">PUBLISH</button>
+          <button class="btn btn-ghost">EDIT</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">F — <b>Cinzel</b> engraved caps + Silkscreen micro-type.</p>
+  </div>
+</section>
+
+<style>
+  .wordmark { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--lav); letter-spacing: -0.06em; display: inline-block; margin-bottom: 16px; }
+  .opt-pixel .tag,
+  .opt-pixel .badge,
+  .opt-pixel .field label,
+  .opt-pixel .switch-label,
+  .opt-pixel .caption { font-family: var(--pf); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 400; }
+  .opt-pixel .switch-label { letter-spacing: 0.04em; text-transform: none; }
+  #d .damask, #e .damask, #f .damask {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='none' stroke='%2323222E' stroke-width='1.1'%3E%3Cpath d='M42 14c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Cpath d='M42 70c9-6 9-16 0-22-9 6-9 16 0 22z'/%3E%3Cpath d='M14 42c6-9 16-9 22 0-6 9-16 9-22 0z'/%3E%3Cpath d='M70 42c-6-9-16-9-22 0 6 9 16 9 22 0z'/%3E%3Cpath d='M42 32c5 4 5 12 0 16-5-4-5-12 0-16z'/%3E%3Ccircle cx='42' cy='42' r='2.4'/%3E%3Cpath d='M0 0c16 6 24 16 28 28'/%3E%3Cpath d='M84 0c-16 6-24 16-28 28'/%3E%3Cpath d='M0 84c16-6 24-16 28-28'/%3E%3Cpath d='M84 84c-16-6-24-16-28-28'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 84px 84px;
+  }
+</style>
+
+<!-- ============================ OPTION G — Geist Pixel System (production 8-bit) ============================ -->
+<section class="option opt-pixel" id="g" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Geist Pixel Square', monospace; --uf:'Sora', system-ui, sans-serif;
+  --pf:'Silkscreen', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option G</span>
+    <h2 class="display h1" style="font-size:40px">Geist Pixel System</h2>
+    <p class="lede">Vercel's production-grade bitmap typeface — pixel texture with real metrics, so it ships in a live UI without breaking rhythm. The "right way" to do 8-bit in a product. (Preview hotlinks Vercel's woff2; in the app we'd self-host via <code>npm i geist</code>.)</p>
+    <p class="fonts">Display <b>Geist Pixel Square</b> · UI <b>Sora</b> · Micro-type <b>Silkscreen</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3>A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">G — <b>Geist Pixel Square</b> (production 8-bit) + Silkscreen.</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION H — Gothic Pixel (Jacquarda Bastarda 9) ============================ -->
+<section class="option opt-pixel" id="h" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Jacquarda Bastarda 9', serif; --uf:'Sora', system-ui, sans-serif;
+  --pf:'Silkscreen', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option H</span>
+    <h2 class="display h1" style="font-size:44px">Gothic Pixel</h2>
+    <p class="lede">Jacquarda Bastarda 9 is a free Google pixel <b>blackletter</b> — gothic + 8-bit at once, a natural fit for a "haunted manor" with the logo's texture. Serif-flourished, pixelated, and zero licensing friction.</p>
+    <p class="fonts">Display <b>Jacquarda Bastarda 9</b> (pixel blackletter) · UI <b>Sora</b> · Micro-type <b>Silkscreen</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3 style="font-size:20px">A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">H — <b>Jacquarda Bastarda 9</b> pixel blackletter (free).</p>
+  </div>
+</section>
+
+<!-- ============================ OPTION I — Woven Pixel (Jacquard 24, damask-echo) ============================ -->
+<section class="option opt-pixel" id="i" style="
+  --bg:#0A0A0D; --surface-1:#0E0E13; --surface-2:#16161E; --surface-3:#1C1C26;
+  --text:#ECE9F5; --text-dim:#C9C5D6; --muted:#8E8AA0; --faint:#5F5C72;
+  --hairline:rgba(155,134,255,0.14);
+  --primary:#9B6BFF; --lav:#B9A6FF;
+  --df:'Jacquard 24', serif; --uf:'Sora', system-ui, sans-serif;
+  --pf:'Silkscreen', monospace;
+  --r:14px;">
+  <div class="damask"></div>
+  <div class="glow-a"></div>
+  <div class="wrap">
+    <span class="wordmark">GHOSTR</span>
+    <span class="tag">Option I</span>
+    <h2 class="display h1" style="font-size:42px">Woven Pixel</h2>
+    <p class="lede">Jacquard 24 is a woven/tapestry pixel face — its thread-like texture rhymes with the damask background (jacquard = the loom that weaves damask), tying typography and pattern into one idea. Free on Google Fonts.</p>
+    <p class="fonts">Display <b>Jacquard 24</b> (woven pixel) · UI <b>Sora</b> · Micro-type <b>Silkscreen</b></p>
+    <div class="stage">
+      <div class="card">
+        <h3 style="font-size:20px">A draft, approved.</h3>
+        <div class="meta">Submitted by a delegate · just now</div>
+        <p>The composer turns mentions into pills that survive copy/paste and editing — no broken npubs, ever.</p>
+        <div class="pillrow">
+          <span class="badge purple">@mention</span>
+          <span class="badge purple">kind 1</span>
+          <span class="badge ghost">draft</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary">Publish</button>
+          <button class="btn btn-ghost">Edit</button>
+          <div class="switch"></div>
+          <span class="switch-label">Credit Ghostr</span>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <div class="field"><label>Title</label><input class="input" value="Midnight missive" /></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">I — <b>Jacquard 24</b> woven pixel, echoing the damask weave.</p>
+  </div>
+</section>
+
+<style>
+  @font-face {
+    font-family: 'Geist Pixel Square';
+    src: url('https://vercel.com/vc-ap-vercel-marketing/_next/static/immutable/media/GeistPixel_Square.p.3ig4wtfmw09gh.woff2') format('woff2');
+    font-display: swap;
+  }
+  #g .damask, #h .damask, #i .damask {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='none' stroke='%2323222E' stroke-width='1.1'%3E%3Cpath d='M42 14c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Cpath d='M42 70c9-6 9-16 0-22-9 6-9 16 0 22z'/%3E%3Cpath d='M14 42c6-9 16-9 22 0-6 9-16 9-22 0z'/%3E%3Cpath d='M70 42c-6-9-16-9-22 0 6 9 16 9 22 0z'/%3E%3Cpath d='M42 32c5 4 5 12 0 16-5-4-5-12 0-16z'/%3E%3Ccircle cx='42' cy='42' r='2.4'/%3E%3Cpath d='M0 0c16 6 24 16 28 28'/%3E%3Cpath d='M84 0c-16 6-24 16-28 28'/%3E%3Cpath d='M0 84c16-6 24-16 28-28'/%3E%3Cpath d='M84 84c-16-6-24-16-28-28'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 84px 84px;
+  }
+</style>
+
+<!-- Apply the damask tint per option (color-mix on stroke via CSS var trick) -->
+<style>
+  /* Option A damask */
+  #a .damask { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='none' stroke='%2323222E' stroke-width='1.1'%3E%3Cpath d='M42 14c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Cpath d='M42 70c9-6 9-16 0-22-9 6-9 16 0 22z'/%3E%3Cpath d='M14 42c6-9 16-9 22 0-6 9-16 9-22 0z'/%3E%3Cpath d='M70 42c-6-9-16-9-22 0 6 9 16 9 22 0z'/%3E%3Cpath d='M42 32c5 4 5 12 0 16-5-4-5-12 0-16z'/%3E%3Ccircle cx='42' cy='42' r='2.4'/%3E%3Cpath d='M0 0c16 6 24 16 28 28'/%3E%3Cpath d='M84 0c-16 6-24 16-28 28'/%3E%3Cpath d='M0 84c16-6 24-16 28-28'/%3E%3Cpath d='M84 84c-16-6-24-16-28-28'/%3E%3C/g%3E%3C/svg%3E"); background-size: 84px 84px; }
+  #b .damask { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='none' stroke='%23262630' stroke-width='1.3' stroke-opacity='0.9'%3E%3Cpath d='M42 14c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Cpath d='M42 70c9-6 9-16 0-22-9 6-9 16 0 22z'/%3E%3Cpath d='M14 42c6-9 16-9 22 0-6 9-16 9-22 0z'/%3E%3Cpath d='M70 42c-6-9-16-9-22 0 6 9 16 9 22 0z'/%3E%3Cpath d='M42 32c5 4 5 12 0 16-5-4-5-12 0-16z'/%3E%3Ccircle cx='42' cy='42' r='2.4'/%3E%3Cpath d='M0 0c16 6 24 16 28 28'/%3E%3Cpath d='M84 0c-16 6-24 16-28 28'/%3E%3Cpath d='M0 84c16-6 24-16 28-28'/%3E%3Cpath d='M84 84c-16-6-24-16-28-28'/%3E%3C/g%3E%3C/svg%3E"); background-size: 84px 84px; }
+  #c .damask { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='none' stroke='%231F1F2A' stroke-width='1' stroke-opacity='0.8'%3E%3Cpath d='M42 14c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Cpath d='M42 70c9-6 9-16 0-22-9 6-9 16 0 22z'/%3E%3Cpath d='M14 42c6-9 16-9 22 0-6 9-16 9-22 0z'/%3E%3Cpath d='M70 42c-6-9-16-9-22 0 6 9 16 9 22 0z'/%3E%3Cpath d='M42 32c5 4 5 12 0 16-5-4-5-12 0-16z'/%3E%3Ccircle cx='42' cy='42' r='2.4'/%3E%3Cpath d='M0 0c16 6 24 16 28 28'/%3E%3Cpath d='M84 0c-16 6-24 16-28 28'/%3E%3Cpath d='M0 84c16-6 24-16 28-28'/%3E%3Cpath d='M84 84c-16-6-24-16-28-28'/%3E%3C/g%3E%3C/svg%3E"); background-size: 84px 84px; }
+</style>
+
+</body>
+</html>

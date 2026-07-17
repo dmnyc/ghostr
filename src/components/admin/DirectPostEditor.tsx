@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Send, Loader2, Save, Trash2, RefreshCw, Plus, X, MessageSquare, LayoutList, BookOpen } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, Save, Trash2, RefreshCw, Plus, X, MessageSquare, LayoutList, BookOpen, Lock, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -60,13 +60,15 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [coverImage, setCoverImage] = useState<string | undefined>()
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishingPostIndex, setPublishingPostIndex] = useState<number | null>(null)
+  const [postTypeLocked, setPostTypeLocked] = useState(false)
+  const [showUnlockDialog, setShowUnlockDialog] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([])
   const [hasChanges, setHasChanges] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [pendingModeChange, setPendingModeChange] = useState<'short' | 'long' | null>(null)
+  const [pendingModeChange, setPendingModeChange] = useState<'short' | 'long' | 'thread' | null>(null)
   const [lastRelaySave, setLastRelaySave] = useState<number | null>(null)
 
   const imageUrls = extractImageUrls(content)
@@ -218,41 +220,51 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
     setThreadPostImages((imgs) => imgs.length > 1 ? imgs.filter((_, i) => i !== index) : imgs)
   }
 
-  const threadHasMultiplePosts = () =>
-    threadPosts.filter((post, i) => post.trim().length > 0 || (threadPostImages[i]?.length ?? 0) > 0).length > 1
+  const hasContent = () =>
+    content.trim() || title.trim() || summary.trim() ||
+    attachedImages.length > 0 ||
+    (isThread && threadPosts.some((p, i) => p.trim() || (threadPostImages[i]?.length ?? 0) > 0))
 
   const requestShortNoteMode = () => {
-    if (isThread && threadHasMultiplePosts()) {
-      setPendingModeChange('short')
-      return
-    }
+    if (postTypeLocked) return
+    if (!isLongForm && !isThread) return
+    if (hasContent()) { setPendingModeChange('short'); return }
     setIsLongForm(false)
     setIsThread(false)
   }
 
   const requestLongFormMode = () => {
-    if (isThread && threadHasMultiplePosts()) {
-      setPendingModeChange('long')
-      return
-    }
+    if (postTypeLocked) return
+    if (isLongForm) return
+    if (hasContent()) { setPendingModeChange('long'); return }
     if (isThread) disableThreadMode()
     setIsLongForm(true)
   }
 
   const confirmPendingModeChange = () => {
     if (pendingModeChange === 'short') {
+      if (isThread) disableThreadMode()
       setIsLongForm(false)
       setIsThread(false)
     } else if (pendingModeChange === 'long') {
-      disableThreadMode()
+      if (isThread) disableThreadMode()
       setIsLongForm(true)
+    } else if (pendingModeChange === 'thread') {
+      const isInitialEmpty = threadPosts.length === 1 && threadPosts[0] === ''
+      if (isInitialEmpty && (content.trim() || attachedImages.length > 0)) {
+        setThreadPosts([content])
+        setThreadPostImages([attachedImages])
+      }
+      setIsThread(true)
+      setIsLongForm(false)
     }
-    setThreadPosts([''])
-    setThreadPostImages([[]])
     setPendingModeChange(null)
   }
 
   const enableThreadMode = () => {
+    if (postTypeLocked) return
+    if (isThread) return
+    if (hasContent()) { setPendingModeChange('thread'); return }
     // Only seed threadPosts from content the first time entering thread mode.
     // Otherwise preserve any structured thread the user already built.
     const isInitialEmpty = threadPosts.length === 1 && threadPosts[0] === ''
@@ -706,6 +718,16 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 onClick={() => {
                   const draft = createDraft(isLongForm ? 30023 : 1)
                   initializedDraftId.current = draft.id
+                  const tags: string[][] = []
+                  if (!isLongForm && isThread) tags.push(['ghostr-thread', 'true'])
+                  updateDraft(draft.id, {
+                    title,
+                    content: !isLongForm && isThread ? threadContent() : content,
+                    targetKind: isLongForm ? 30023 : 1,
+                    tags,
+                    coverImage,
+                    uploadedImages: attachedImages,
+                  })
                   setHasChanges(false)
                   toast({
                     title: 'Draft saved',
@@ -728,7 +750,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
               ) : (
                 <Send className="mr-2 h-4 w-4" />
               )}
-              {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
+              {isPublishing
+                ? (!isLongForm && isThread && publishingPostIndex !== null
+                  ? `Publishing post ${publishingPostIndex + 1} of ${threadPosts.map((post) => post.trim()).filter(Boolean).length}…`
+                  : 'Publishing...')
+                : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
             </Button>
             </div>
           )}
@@ -806,6 +832,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                       onChange={(value) => updateThreadPost(index, value)}
                       placeholder={`Thread post ${index + 1}`}
                       minHeight="140px"
+                      compact
                     />
                     <ImageThumbnailGrid
                       images={threadPostImages[index] ?? []}
@@ -872,18 +899,36 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            {isPublishing ? 'Publishing...' : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
+            {isPublishing
+                ? (!isLongForm && isThread && publishingPostIndex !== null
+                  ? `Publishing post ${publishingPostIndex + 1} of ${threadPosts.map((post) => post.trim()).filter(Boolean).length}…`
+                  : 'Publishing...')
+                : isDirectPostMode.current ? 'Publish Now' : 'Publish'}
           </Button>
           <div className="rounded-lg border velvet bg-card p-4 space-y-4">
-            <h3 className="font-medium">Post Type</h3>
-            <div className="flex items-center bg-primary/15 rounded-full p-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Post Type</h3>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-7 px-2"
+                onClick={() => postTypeLocked ? setShowUnlockDialog(true) : setPostTypeLocked(true)}
+                title={postTypeLocked ? 'Unlock post type' : 'Lock post type'}
+              >
+                {postTypeLocked
+                  ? <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium"><Lock className="h-3.5 w-3.5" /> Locked</span>
+                  : <Unlock className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
+                                    <div className={cn("flex flex-col gap-2 transition-opacity", postTypeLocked && "opacity-60")}>
               <button
                 onClick={requestShortNoteMode}
+                disabled={postTypeLocked}
                 className={cn(
                   'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   !isLongForm && !isThread
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                    ? 'ring-2 ring-primary bg-primary/10 text-primary'
+                    : 'border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 )}
               >
                 <span className="flex items-center gap-2"><MessageSquare className="h-4 w-4 shrink-0" />Short Note</span>
@@ -891,11 +936,12 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
               </button>
               <button
                 onClick={enableThreadMode}
+                disabled={postTypeLocked}
                 className={cn(
                   'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   !isLongForm && isThread
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                    ? 'ring-2 ring-primary bg-primary/10 text-primary'
+                    : 'border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 )}
               >
                 <span className="flex items-center gap-2"><LayoutList className="h-4 w-4 shrink-0" />Thread</span>
@@ -903,11 +949,12 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
               </button>
               <button
                 onClick={requestLongFormMode}
+                disabled={postTypeLocked}
                 className={cn(
                   'w-full px-3 py-2.5 rounded-lg text-base font-medium text-left transition-colors',
                   isLongForm
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                    ? 'ring-2 ring-primary bg-primary/10 text-primary'
+                    : 'border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 )}
               >
                 <span className="flex items-center gap-2"><BookOpen className="h-4 w-4 shrink-0" />Long-form</span>
@@ -963,6 +1010,38 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             <AlertDialogAction onClick={confirmPendingModeChange}>
               Discard and switch
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mode change confirmation */}
+      <AlertDialog open={pendingModeChange !== null} onOpenChange={(open) => !open && setPendingModeChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change post type?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Switching post types will alter your formatting. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingModeChange}>Change</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unlock confirmation */}
+      <AlertDialog open={showUnlockDialog} onOpenChange={setShowUnlockDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock post type?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will allow changing the post type, which may alter your formatting.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPostTypeLocked(false); setShowUnlockDialog(false) }}>Unlock</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

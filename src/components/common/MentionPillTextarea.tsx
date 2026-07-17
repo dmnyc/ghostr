@@ -18,6 +18,7 @@ interface MentionPillTextareaProps {
   disabled?: boolean
   className?: string
   minHeight?: string
+  compact?: boolean
 }
 
 /**
@@ -75,6 +76,7 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
       disabled = false,
       className,
       minHeight = '200px',
+      compact = false,
     },
     ref
   ) => {
@@ -573,8 +575,8 @@ export const MentionPillTextarea = forwardRef<HTMLDivElement, MentionPillTextare
     }
 
     return (
-      <div className={cn("rounded-lg border velvet bg-card overflow-hidden max-w-full", className)}>
-        <div className="flex border-b bg-muted/30">
+      <div className={cn(compact ? "rounded-lg border bg-background overflow-hidden max-w-full" : "rounded-lg border velvet bg-card overflow-hidden max-w-full", className)}>
+        <div className={cn("flex border-b bg-muted/30", compact && "hidden")}>
           <button
             type="button"
             className={cn(
