@@ -818,15 +818,12 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                     <p className="italic">Paste text with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
-                  <div>
-                    <span className="text-sm font-medium">Auto-number posts</span>
-                    <p className="text-xs text-muted-foreground">Appends (1/N) to each post when published</p>
-                  </div>
+                <div className="flex items-center gap-2">
                   <Switch
                     checked={threadAutoNumber}
                     onCheckedChange={setThreadAutoNumber}
                   />
+                  <span className="text-sm text-muted-foreground">Auto-number posts (1/N)</span>
                 </div>
                 {threadPosts.map((post, index) => (
                   <div key={`${splitVersion}-${index}`} className="space-y-1.5">
