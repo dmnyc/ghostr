@@ -893,6 +893,7 @@ Third post text</pre><Button type="button" variant="outline" size="sm" className
                         )}
                       </div>
                     </div>
+                    <div className="relative">
                     <MentionPillTextarea
                       value={post}
                       onChange={(value) => handleThreadPostChange(index, value)}
@@ -902,10 +903,12 @@ Third post text</pre><Button type="button" variant="outline" size="sm" className
                     compact
                     />
                     {threadAutoNumber && (
-                      <div className="text-right text-xs text-muted-foreground/50 italic">
-                        ({index + 1}/{threadPosts.filter((p, i) => p.trim() || (threadPostImages[i]?.length ?? 0) > 0).length})
-                      </div>
+                      <span className="absolute bottom-2 left-3 text-xs text-muted-foreground/40 pointer-events-none select-none">
+                        {index + 1} of {threadPosts.filter((p, i) => p.trim() || (threadPostImages[i]?.length ?? 0) > 0).length}
+                      </span>
                     )}
+                    </div>
+
                     <ImageThumbnailGrid
                       images={threadPostImages[index] ?? []}
                       onRemove={(url) => handleRemoveThreadPostImage(index, url)}
