@@ -56,6 +56,7 @@ import { extractImageUrls } from "@/lib/blossom";
 import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
 import { cn } from "@/lib/utils/cn";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { hasThreadMarker, joinThreadPosts, splitThreadPosts, stripThreadMarker } from "@/lib/threadUtils";
 import { getNoteUrl } from '@/lib/nostrClients'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -847,7 +848,15 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
               <div className="space-y-4">
                 <div className="space-y-2 text-xs text-muted-foreground">
                   <p>Each post is sent for publisher review and published as a sequential kind 1 reply.</p>
-                  <p className="italic">Paste a draft with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
+                  <p>Hint: Paste text with <code className="font-mono">---</code> on its own line between posts to auto-split. <Popover><PopoverTrigger asChild><button type="button" className="text-primary hover:underline cursor-pointer">Show example</button></PopoverTrigger><PopoverContent className="w-80" align="start"><div className="space-y-2"><p className="text-xs font-medium text-muted-foreground">Example thread format:</p><pre className="text-xs bg-muted rounded-md p-3 font-mono whitespace-pre-wrap break-words">First post text
+
+---
+
+Second post text
+
+---
+
+Third post text</pre><Button type="button" variant="outline" size="sm" className="w-full" onClick={() => navigator.clipboard.writeText('First post text\n\n---\n\nSecond post text\n\n---\n\nThird post text')}>Copy example</Button></div></PopoverContent></Popover></p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch
