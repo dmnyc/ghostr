@@ -55,6 +55,7 @@ import type { DraftPublisher } from "@/types/draft";
 import { extractImageUrls } from "@/lib/blossom";
 import { extractAllUrls, fetchLinkMetadata, type LinkMetadata, isImageUrl } from "@/lib/urlUtils";
 import { cn } from "@/lib/utils/cn";
+import { Switch } from "@/components/ui/switch";
 import { hasThreadMarker, joinThreadPosts, splitThreadPosts, stripThreadMarker } from "@/lib/threadUtils";
 import { getNoteUrl } from '@/lib/nostrClients'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -88,6 +89,7 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
   const [content, setContent] = useState(draft?.content ?? "");
   const [isLongForm, setIsLongForm] = useState(draft?.targetKind === 30023);
   const [lengthWarningDismissed, setLengthWarningDismissed] = useState(false);
+  const [threadAutoNumber, setThreadAutoNumber] = useState(false);
   const [threadPosts, setThreadPosts] = useState<string[]>(() => {
     const savedAsThread = draft?.targetKind === 1 && hasThreadMarker(draft?.tags ?? []);
     if (!savedAsThread) return [draft?.content ?? ""];
@@ -1134,8 +1136,21 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
+            {isThread && !isLongForm && !isSubmittedOrPublished && (
+              <div className="pt-2 border-t">
+                <div className="flex items-center gap-2 text-sm">
+                  <Switch
+                    checked={threadAutoNumber}
+                    onCheckedChange={setThreadAutoNumber}
+                  />
+                  <span>Auto-number posts (1/N)</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Appends (1/N) to the end of each post when published
+                </p>
+              </div>
+            )}
           </div>
-
           {draft.status === "submitted" && !draft.publishedEventId && (
             <div className="rounded-lg border velvet bg-card p-4">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500">

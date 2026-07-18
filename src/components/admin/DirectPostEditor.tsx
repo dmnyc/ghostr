@@ -67,6 +67,7 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
   const [showUnlockDialog, setShowUnlockDialog] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
+  const [threadAutoNumber, setThreadAutoNumber] = useState(false)
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const [attachedLinks, setAttachedLinks] = useState<LinkMetadata[]>([])
   const [hasChanges, setHasChanges] = useState(false)
@@ -478,6 +479,9 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             postFinalContent = postFinalContent.length > 0
               ? `${postFinalContent}\n${p.images.join('\n')}`
               : p.images.join('\n')
+          }
+          if (threadAutoNumber) {
+            postFinalContent = `${postFinalContent}\n\n(${index + 1}/${cleanThreadPosts.length})`
           }
 
           const threadEvent = new NDKEvent(ndk)
@@ -968,6 +972,21 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
+            {isThread && !isLongForm && (
+              <div className="pt-2 border-t">
+                <div className="flex items-center gap-2 text-sm">
+                  <Switch
+                    checked={threadAutoNumber}
+                    onCheckedChange={setThreadAutoNumber}
+                  />
+                  <span>Auto-number posts (1/N)</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Appends (1/N) to the end of each post when published
+                </p>
+              </div>
+            )}
+
             <div className="pt-2 border-t">
               <div className="flex items-center gap-2 text-sm">
                 <Switch
