@@ -849,6 +849,17 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                   <p>Each post is sent for publisher review and published as a sequential kind 1 reply.</p>
                   <p className="italic">Paste a draft with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
                 </div>
+                <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
+                  <div>
+                    <span className="text-sm font-medium">Auto-number posts</span>
+                    <p className="text-xs text-muted-foreground">Appends (1/N) to each post when published</p>
+                  </div>
+                  <Switch
+                    checked={threadAutoNumber}
+                    onCheckedChange={setThreadAutoNumber}
+                    disabled={isSubmittedOrPublished}
+                  />
+                </div>
                 {threadPosts.map((post, index) => (
                   <div key={`${splitVersion}-${index}`} className="space-y-1.5">
                     <div className="flex items-center justify-between min-h-[1.5rem]">
@@ -884,6 +895,11 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                       minHeight="140px"
                     compact
                     />
+                    {threadAutoNumber && (
+                      <div className="text-right text-xs text-muted-foreground/50 italic">
+                        ({index + 1}/{threadPosts.filter((p, i) => p.trim() || (threadPostImages[i]?.length ?? 0) > 0).length})
+                      </div>
+                    )}
                     <ImageThumbnailGrid
                       images={threadPostImages[index] ?? []}
                       onRemove={(url) => handleRemoveThreadPostImage(index, url)}
@@ -1136,20 +1152,6 @@ export function DraftEditor({ onBack }: DraftEditorProps) {
                 <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
-            {isThread && !isLongForm && !isSubmittedOrPublished && (
-              <div className="pt-2 border-t">
-                <div className="flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={threadAutoNumber}
-                    onCheckedChange={setThreadAutoNumber}
-                  />
-                  <span>Auto-number posts (1/N)</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Appends (1/N) to the end of each post when published
-                </p>
-              </div>
-            )}
           </div>
           {draft.status === "submitted" && !draft.publishedEventId && (
             <div className="rounded-lg border velvet bg-card p-4">

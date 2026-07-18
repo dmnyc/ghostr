@@ -812,9 +812,21 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
             </div>
             {!isLongForm && isThread ? (
               <div className="space-y-4">
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <p>Each box publishes as a sequential kind 1 reply.</p>
-                  <p className="italic">Paste text with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>Each box publishes as a sequential kind 1 reply.</p>
+                    <p className="italic">Paste text with <code className="font-mono not-italic">---</code> on its own line between posts to auto-split.</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
+                  <div>
+                    <span className="text-sm font-medium">Auto-number posts</span>
+                    <p className="text-xs text-muted-foreground">Appends (1/N) to each post when published</p>
+                  </div>
+                  <Switch
+                    checked={threadAutoNumber}
+                    onCheckedChange={setThreadAutoNumber}
+                  />
                 </div>
                 {threadPosts.map((post, index) => (
                   <div key={`${splitVersion}-${index}`} className="space-y-1.5">
@@ -845,6 +857,11 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                       minHeight="140px"
                       compact
                     />
+                    {threadAutoNumber && (
+                      <div className="text-right text-xs text-muted-foreground/50 italic">
+                        ({index + 1}/{threadPosts.filter((p, i) => p.trim() || (threadPostImages[i]?.length ?? 0) > 0).length})
+                      </div>
+                    )}
                     <ImageThumbnailGrid
                       images={threadPostImages[index] ?? []}
                       onRemove={(url) => removeImageFromThreadPost(index, url)}
@@ -972,21 +989,6 @@ export function DirectPostEditor({ onBack, onPublished }: DirectPostEditorProps)
                 <p className="text-sm font-normal opacity-75 mt-0.5 ml-6">Articles with full markdown</p>
               </button>
             </div>
-            {isThread && !isLongForm && (
-              <div className="pt-2 border-t">
-                <div className="flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={threadAutoNumber}
-                    onCheckedChange={setThreadAutoNumber}
-                  />
-                  <span>Auto-number posts (1/N)</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Appends (1/N) to the end of each post when published
-                </p>
-              </div>
-            )}
-
             <div className="pt-2 border-t">
               <div className="flex items-center gap-2 text-sm">
                 <Switch
