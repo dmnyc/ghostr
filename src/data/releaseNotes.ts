@@ -18,6 +18,19 @@ export interface ReleaseNote {
  */
 export const releaseNotes: ReleaseNote[] = [
   {
+    version: '0.9.1',
+    date: 'September 6, 2026',
+    highlights: [
+      'Thread drafting — compose, draft, and submit multi-post threads end to end',
+      'Optional 1/N auto-numbering with a live ghost preview in the composer',
+      'Post type safety — switching between note and article confirms before reshaping content',
+      'Pick which Nostr client opens your published posts and profile links',
+      'Fixed the blank page when opening History with a long-form article in it',
+      'Long-form drafts from other clients (kind 30024 and NIP-37 wraps) now appear in the publisher Drafts tab, read-only until imported',
+      'Dependency and security updates across the board',
+    ],
+  },
+  {
     version: '0.9.0',
     date: 'July 17, 2026',
     highlights: [
