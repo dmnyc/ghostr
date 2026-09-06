@@ -6,6 +6,7 @@ import {
   saveDraftNIP37,
   deleteDraftNIP37,
 } from "@/lib/nostr/nip37";
+import { isExternalDraftId } from "@/lib/nostr/externalDrafts";
 import { isInAppWebView, withTimeout } from "@/lib/ndk/signers";
 import { sendGiftWrappedRetraction } from "@/lib/nostr/nip59";
 import { npubToPubkey } from "@/stores/authStore";
@@ -22,7 +23,10 @@ function loadCachedDrafts(): Draft[] {
   try {
     const cached = localStorage.getItem(DRAFTS_CACHE_KEY);
     if (cached) {
-      return JSON.parse(cached) as Draft[];
+      // Drafts from other clients belong to the publisher dashboard only
+      return (JSON.parse(cached) as Draft[]).filter(
+        (d) => !isExternalDraftId(d.id),
+      );
     }
   } catch {
     // Ignore cache errors

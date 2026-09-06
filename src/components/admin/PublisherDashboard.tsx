@@ -9,6 +9,7 @@ import { DirectPostEditor } from './DirectPostEditor'
 import { EditArticleEditor } from './EditArticleEditor'
 import { PublisherDraftList } from './PublisherDraftList'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { useSubmissionStore, initializeProcessedIds, syncProcessedIdsFromRelay } from '@/stores/submissionStore'
 import { useAdminInbox } from '@/hooks/useAdminInbox'
 import { usePublishHistoryStore, type PublishedItem } from '@/stores/publishHistoryStore'
@@ -70,7 +71,8 @@ export function PublisherDashboard() {
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length
   const archivedSubmissionsCount = archivedSubmissions.length
-  const draftCount = drafts.filter((d) => d.status === 'draft' && !d.archived).length
+  // Drafts from other clients live in their own section and don't count toward the tab badge
+  const draftCount = drafts.filter((d) => d.status === 'draft' && !d.archived && !d.external).length
   const unreadHistoryCount = getUnreadCount()
 
   const handleTabChange = (value: string) => {
@@ -125,7 +127,9 @@ export function PublisherDashboard() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <HistoryList onEditArticle={setEditingArticle} />
+          <ErrorBoundary label="history">
+            <HistoryList onEditArticle={setEditingArticle} />
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="archived-submissions" className="mt-4">

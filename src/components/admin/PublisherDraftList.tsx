@@ -1,4 +1,4 @@
-import { FileText, Trash2, Archive, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
+import { FileText, Trash2, Archive, RotateCcw, ChevronDown, ChevronRight, Download, Globe } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -26,8 +26,36 @@ interface PublisherDraftCardProps {
 }
 
 function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardProps) {
-  const { setCurrentDraft, deleteDraft, archiveDraft, updateDraft, drafts } = usePublisherDraftStore()
+  const { setCurrentDraft, deleteDraft, archiveDraft, updateDraft, drafts, importExternalDraft } =
+    usePublisherDraftStore()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+
+  // Drafts from other clients are read-only until imported into Ghostr
+  const external = draft.external
+  const sourceLabel = external?.client || 'another client'
+
+  const handleImport = async () => {
+    setIsImporting(true)
+    try {
+      const imported = await importExternalDraft(draft.id)
+      if (imported) {
+        toast({
+          title: 'Draft imported',
+          description: `Copied from ${sourceLabel}. The original is untouched.`,
+        })
+        setCurrentDraft(imported.id)
+      }
+    } catch (error) {
+      toast({
+        title: 'Import failed',
+        description: error instanceof Error ? error.message : 'Failed to import draft.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
 
   const handleEdit = () => {
     setCurrentDraft(draft.id)
@@ -92,11 +120,22 @@ function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardPro
               {draft.title || (draft.targetKind === 1 ? 'Short Note Draft' : 'Untitled Draft')}
             </h3>
           </div>
+          {external && (
+            <span className="shrink-0 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+              Read-only
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Kind {draft.targetKind === 1 ? '1 (Note)' : '30023 (Article)'}</span>
           <span>•</span>
           <span>{formattedDate}</span>
+          {external && (
+            <>
+              <span>•</span>
+              <span className="truncate">From {sourceLabel}</span>
+            </>
+          )}
         </div>
       </CardHeader>
 
@@ -109,7 +148,19 @@ function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardPro
       </CardContent>
 
       <CardFooter className="gap-2">
-        {isArchived ? (
+        {external ? (
+          <Button
+            variant="default"
+            size="sm"
+            className="flex-1 gap-2"
+            onClick={handleImport}
+            disabled={isImporting}
+            title="Copy this draft into Ghostr to edit it"
+          >
+            <Download className="h-4 w-4" />
+            {isImporting ? 'Importing...' : 'Import to edit'}
+          </Button>
+        ) : isArchived ? (
           <Button
             variant="outline"
             size="sm"
@@ -161,21 +212,27 @@ function PublisherDraftCard({ draft, isArchived = false }: PublisherDraftCardPro
 export function PublisherDraftList() {
   const { drafts, createDraft, isLoading } = usePublisherDraftStore()
   const [showArchived, setShowArchived] = useState(false)
+  const [showExternal, setShowExternal] = useState(false)
 
   // Filter to only show draft status (non-archived) - published drafts appear in History tab
   // Sort by updatedAt descending (newest first)
-  const activeDrafts = drafts
+  const ownDrafts = drafts.filter((d) => !d.external)
+  const activeDrafts = ownDrafts
     .filter((d) => d.status === 'draft' && !d.archived)
     .sort((a, b) => b.updatedAt - a.updatedAt)
-  const archivedDrafts = drafts
+  const archivedDrafts = ownDrafts
     .filter((d) => d.archived)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  // Read-only drafts written by other clients, kept out of the main grid
+  const externalDrafts = drafts
+    .filter((d) => d.external)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   if (isLoading) {
     return <LoadingState />
   }
 
-  if (activeDrafts.length === 0 && archivedDrafts.length === 0) {
+  if (activeDrafts.length === 0 && archivedDrafts.length === 0 && externalDrafts.length === 0) {
     return (
       <EmptyState
         icon={FileText}
@@ -215,6 +272,39 @@ export function PublisherDraftList() {
             </div>
           }
         />
+      )}
+
+      {externalDrafts.length > 0 && (
+        <div className="border-t pt-6">
+          <button
+            onClick={() => setShowExternal(!showExternal)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          >
+            {showExternal ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            <Globe className="h-4 w-4" />
+            <span>
+              Drafts from Other Clients ({externalDrafts.length})
+            </span>
+          </button>
+
+          {showExternal && (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Read-only drafts found on your relays. Import one to edit it in Ghostr - the
+                original is left untouched.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {externalDrafts.map((draft) => (
+                  <PublisherDraftCard key={draft.id} draft={draft} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {archivedDrafts.length > 0 && (

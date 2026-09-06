@@ -17,5 +17,6 @@ export const ARCHIVED_SUBMISSIONS_D_TAG = 'ghostr-archived-submissions'
 export const EDITED_SUBMISSIONS_D_TAG = 'ghostr-edited-submissions'
 export const DRAFT_KIND = 30078 // Legacy NIP-78 (for migration)
 export const NIP37_DRAFT_KIND = 31234 // NIP-37 draft wraps
+export const LONGFORM_DRAFT_KIND = 30024 // NIP-23 draft long-form articles (other clients)
 export const PROTOCOL_VERSION = 'ghostr_v1'
 export const MAX_PUBLISH_HISTORY_ITEMS = 1000

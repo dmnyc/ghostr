@@ -5,6 +5,8 @@
  * Unlike delegate drafts, publisher drafts don't involve submission workflow,
  * approval process, or publisher selection.
  */
+import type { ExternalDraftSource } from '@/lib/nostr/externalDrafts'
+
 export interface PublisherDraft {
   id: string
   title: string
@@ -17,4 +19,5 @@ export interface PublisherDraft {
   coverImage?: string  // Cover image URL (for long-form articles)
   archived?: boolean  // Whether draft is archived
   uploadedImages?: string[]  // Image URLs uploaded via ImageUploadButton
+  external?: ExternalDraftSource  // Set when the draft comes from another client (read-only)
 }

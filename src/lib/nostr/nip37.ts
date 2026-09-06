@@ -2,6 +2,14 @@ import NDK, { NDKEvent } from "@nostr-dev-kit/ndk";
 import type { Draft } from "@/types/draft";
 import type { PublisherDraft } from "@/types/publisherDraft";
 import { NIP37_DRAFT_KIND, DRAFT_KIND, DRAFT_D_TAG } from "@/lib/constants";
+import {
+  decryptForeignWrap,
+  fetchLongformDrafts,
+  getImportedExternalIds,
+  isExternalDraftId,
+  parseForeignDraftWrap,
+  type ExternalDraftFields,
+} from "@/lib/nostr/externalDrafts";
 import { isInAppWebView, withTimeout } from "@/lib/ndk/signers";
 import { useNDKStore } from "@/stores/ndkStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -141,6 +149,85 @@ export interface LoadPublisherDraftsResult {
   deletedIds: Set<string>; // IDs of drafts that have been deleted (empty content events)
 }
 
+/** Value of an event's client tag, if it has one. */
+function clientTagValue(event: NDKEvent): string | undefined {
+  return event.tags.find((t) => t[0] === "client")?.[1];
+}
+
+/** Wraps written by Ghostr itself - their content is a private payload, not a draft event. */
+function isGhostrWrap(event: NDKEvent): boolean {
+  const client = clientTagValue(event);
+  return client === "ghostr" || client === "ghostr-publisher";
+}
+
+// Decrypting is a signer round trip each, so cap the work spent on foreign wraps
+const MAX_FOREIGN_WRAPS = 25;
+const FOREIGN_DECRYPT_BUDGET_MS = 8000;
+
+/**
+ * Decrypt and parse drafts written by other clients: foreign NIP-37 wraps plus
+ * the user's kind 30024 long-form drafts. Already-imported drafts are dropped
+ * so the Ghostr copy takes their place. Publisher dashboard only.
+ */
+async function collectExternalDrafts(
+  foreignWraps: NDKEvent[],
+): Promise<ExternalDraftFields[]> {
+  const collected: ExternalDraftFields[] = [];
+
+  const recentWraps = [...foreignWraps]
+    .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))
+    .slice(0, MAX_FOREIGN_WRAPS);
+
+  if (foreignWraps.length > recentWraps.length) {
+    console.log(
+      "[NIP-37] Limiting foreign draft wraps to",
+      MAX_FOREIGN_WRAPS,
+      "of",
+      foreignWraps.length,
+    );
+  }
+
+  const startedAt = Date.now();
+  for (const event of recentWraps) {
+    // Empty content is another client's deletion marker
+    if (!event.content) continue;
+
+    // Slow signers (NIP-46) shouldn't hold up the rest of the draft list
+    if (Date.now() - startedAt > FOREIGN_DECRYPT_BUDGET_MS) {
+      console.log("[NIP-37] Foreign draft decrypt budget reached, stopping");
+      break;
+    }
+
+    const decrypted = await decryptForeignWrap(event.content);
+    if (!decrypted) continue;
+
+    const fields = parseForeignDraftWrap(event, decrypted);
+    if (fields) collected.push(fields);
+  }
+
+  try {
+    collected.push(...(await fetchLongformDrafts()));
+  } catch (error) {
+    console.warn("[NIP-37] Failed to load kind 30024 drafts:", error);
+  }
+
+  const imported = getImportedExternalIds();
+
+  // A client may store the same draft as both a 30024 and a 31234 wrap - keep the newest
+  const byDTag = new Map<string, ExternalDraftFields>();
+  for (const draft of collected) {
+    if (imported.has(draft.id)) continue;
+    const existing = byDTag.get(draft.external.dTag);
+    if (!existing || draft.updatedAt > existing.updatedAt) {
+      byDTag.set(draft.external.dTag, draft);
+    }
+  }
+
+  const external = [...byDTag.values()];
+  console.log("[NIP-37] Found", external.length, "drafts from other clients");
+  return external;
+}
+
 /**
  * Load all drafts from relay using NIP-37 format
  */
@@ -184,11 +271,11 @@ export async function loadDraftsNIP37(): Promise<LoadDraftsResult> {
   const drafts: Draft[] = [];
   const deletedIds = new Set<string>();
 
-  // Filter to only Ghostr drafts first
-  const ghostrEvents = Array.from(events).filter((event) => {
-    const clientTag = event.tags.find((t) => t[0] === "client");
-    return clientTag && clientTag[1] === "ghostr";
-  });
+  // Only Ghostr delegate drafts belong in this list - publisher drafts and
+  // drafts from other clients are handled by the publisher dashboard.
+  const ghostrEvents = Array.from(events).filter(
+    (event) => clientTagValue(event) === "ghostr",
+  );
   console.log(
     "[NIP-37] Found",
     ghostrEvents.length,
@@ -508,10 +595,12 @@ export async function loadPublisherDraftsNIP37(): Promise<LoadPublisherDraftsRes
   const drafts: PublisherDraft[] = [];
   const deletedIds = new Set<string>();
 
-  for (const event of events) {
-    // Only process Ghostr publisher drafts (check for client tag)
-    const clientTag = event.tags.find((t) => t[0] === "client");
-    if (!clientTag || clientTag[1] !== "ghostr-publisher") continue;
+  const allEvents = Array.from(events);
+  const foreignEvents = allEvents.filter((event) => !isGhostrWrap(event));
+
+  for (const event of allEvents) {
+    // Only process Ghostr publisher drafts here - foreign wraps are handled below
+    if (clientTagValue(event) !== "ghostr-publisher") continue;
 
     // Get draft ID from d-tag
     const dTag = event.tags.find((t) => t[0] === "d");
@@ -543,6 +632,21 @@ export async function loadPublisherDraftsNIP37(): Promise<LoadPublisherDraftsRes
     }
   }
 
+  // Drafts from other clients, shown read-only until imported
+  for (const fields of await collectExternalDrafts(foreignEvents)) {
+    drafts.push({
+      id: fields.id,
+      title: fields.title,
+      content: fields.content,
+      targetKind: fields.targetKind,
+      tags: fields.tags,
+      status: "draft",
+      updatedAt: fields.updatedAt,
+      coverImage: fields.coverImage,
+      external: fields.external,
+    });
+  }
+
   // Sort by updatedAt descending (newest first)
   drafts.sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -560,6 +664,12 @@ export async function savePublisherDraftNIP37(
 
   if (!ndk || !user || !signer) {
     throw new Error("Not connected or authenticated");
+  }
+
+  if (isExternalDraftId(draft.id)) {
+    // Owned by another client - saving would overwrite their draft
+    console.warn("[NIP-37 Publisher] Refusing to save external draft:", draft.id);
+    return;
   }
 
   const payload = publisherDraftToPayload(draft);
@@ -587,6 +697,12 @@ export async function deletePublisherDraftNIP37(
   draftId: string,
   targetKind: 1 | 30023 = 1,
 ): Promise<void> {
+  if (isExternalDraftId(draftId)) {
+    // Owned by another client - a deletion marker would wipe their draft
+    console.warn("[NIP-37 Publisher] Refusing to delete external draft:", draftId);
+    return;
+  }
+
   const { ndk } = useNDKStore.getState();
   const { user, signer } = useAuthStore.getState();
 
