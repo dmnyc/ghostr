@@ -298,6 +298,7 @@ export function submissionFromPayload(
     content: payload.content,
     kind: payload.kind,
     tags: payload.tags,
+    threadPosts: payload.threadPosts,
     note: payload.note,
     receivedAt: createdAt * 1000, // Convert to milliseconds for JS Date
     status: "pending",

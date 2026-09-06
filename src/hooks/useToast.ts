@@ -1,10 +1,16 @@
 import { create } from 'zustand'
 
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface Toast {
   id: string
   title?: string
   description?: string
   variant?: 'default' | 'destructive'
+  action?: ToastAction
 }
 
 interface ToastStore {
@@ -21,12 +27,13 @@ const useToastStore = create<ToastStore>((set) => ({
       toasts: [...state.toasts, { ...toast, id }],
     }))
 
-    // Auto dismiss after 5 seconds
+    // Auto dismiss: 10s for action toasts, 5s otherwise
+    const timeout = toast.action ? 10000 : 5000
     setTimeout(() => {
       set((state) => ({
         toasts: state.toasts.filter((t) => t.id !== id),
       }))
-    }, 5000)
+    }, timeout)
   },
   dismiss: (id) => {
     set((state) => ({

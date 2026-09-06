@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type { PublisherDraft } from '@/types/publisherDraft'
 import {
+  isExternalDraftId,
+  markExternalDraftImported,
+} from '@/lib/nostr/externalDrafts'
+import {
   loadPublisherDraftsNIP37,
   savePublisherDraftNIP37,
   deletePublisherDraftNIP37,
@@ -102,6 +106,7 @@ interface PublisherDraftStore {
 
   loadDrafts: () => Promise<void>
   createDraft: (targetKind: 1 | 30023) => PublisherDraft
+  importExternalDraft: (id: string) => Promise<PublisherDraft | null>
   updateDraft: (id: string, updates: Partial<PublisherDraft>) => void
   deleteDraft: (id: string) => Promise<void>
   setCurrentDraft: (id: string | null) => void
@@ -214,7 +219,50 @@ export const usePublisherDraftStore = create<PublisherDraftStore>((set, get) => 
     return newDraft
   },
 
+  /**
+   * Copy a draft written by another client into a Ghostr draft.
+   * The original event is left untouched so the source client keeps its copy.
+   */
+  importExternalDraft: async (id) => {
+    const external = get().drafts.find((d) => d.id === id)
+    if (!external?.external) return null
+
+    const imported: PublisherDraft = {
+      id: uuidv4(),
+      title: external.title,
+      content: external.content,
+      targetKind: external.targetKind,
+      tags: external.tags,
+      coverImage: external.coverImage,
+      status: 'draft',
+      updatedAt: Date.now(),
+    }
+
+    // Remember the source so it stops showing up alongside the imported copy
+    markExternalDraftImported(id)
+
+    set((state) => {
+      const newDrafts = [imported, ...state.drafts.filter((d) => d.id !== id)]
+      saveDraftsToCache(newDrafts)
+      return { drafts: newDrafts }
+    })
+
+    try {
+      await savePublisherDraftNIP37(imported)
+    } catch (error) {
+      console.error('[PublisherDraftStore] Failed to save imported draft:', error)
+    }
+
+    return imported
+  },
+
   updateDraft: (id, updates) => {
+    if (isExternalDraftId(id)) {
+      // Read-only until imported
+      console.warn('[PublisherDraftStore] Ignoring edit to external draft:', id)
+      return
+    }
+
     set((state) => {
       const newDrafts = state.drafts.map((draft) =>
         draft.id === id ? { ...draft, ...updates, updatedAt: Date.now() } : draft

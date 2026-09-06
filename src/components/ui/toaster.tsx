@@ -20,9 +20,20 @@ export function Toaster() {
               <div className="font-semibold">{toast.title}</div>
             )}
             {toast.description && (
-              <div className="text-sm text-muted-foreground">{toast.description}</div>
+              <div className={cn("text-sm", toast.variant === 'destructive' ? "text-destructive-foreground/80" : "text-muted-foreground")}>{toast.description}</div>
             )}
           </div>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action!.onClick()
+                dismiss(toast.id)
+              }}
+              className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button
             onClick={() => dismiss(toast.id)}
             className="rounded-sm opacity-70 hover:opacity-100"

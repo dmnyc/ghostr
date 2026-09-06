@@ -1,6 +1,6 @@
 {
   "name": "ghostr",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Nostr delegation and approval workflow application",
   "type": "module",
   "scripts": {
@@ -34,7 +34,7 @@
     "dompurify": "^3.3.1",
     "lucide-react": "^0.562.0",
     "markdown-it": "^14.1.0",
-    "nostr-tools": "^2.19.4",
+    "nostr-tools": "^2.25.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",

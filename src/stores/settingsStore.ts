@@ -17,6 +17,7 @@ interface SettingsStore {
   theme: Theme
   creditGhostr: boolean
   enableBotNotifications: boolean
+  noteViewerClient: string
 
   // Relay configuration
   relays: RelayConfig[]
@@ -28,6 +29,7 @@ interface SettingsStore {
   setTheme: (theme: Theme) => void
   setCreditGhostr: (credit: boolean) => void
   setBotNotifications: (enabled: boolean) => void
+  setNoteViewerClient: (client: string) => void
   setRelays: (relays: RelayConfig[]) => void
   addRelay: (url: string) => void
   removeRelay: (url: string) => void
@@ -50,6 +52,7 @@ export const useSettingsStore = create<SettingsStore>()(
       theme: 'dark',
       creditGhostr: true,
       enableBotNotifications: true,
+      noteViewerClient: 'jumble',
       relays: DEFAULT_RELAYS,
       useNIP65: true,
       nip65Relays: [],
@@ -64,6 +67,8 @@ export const useSettingsStore = create<SettingsStore>()(
       setCreditGhostr: (credit) => set({ creditGhostr: credit }),
 
       setBotNotifications: (enabled) => set({ enableBotNotifications: enabled }),
+
+      setNoteViewerClient: (client) => set({ noteViewerClient: client }),
 
       setRelays: (relays) => set({ relays }),
 

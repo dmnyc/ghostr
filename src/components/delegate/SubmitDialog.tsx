@@ -27,6 +27,7 @@ import {
   createNewSubmissionNotification,
   createSubmissionReceivedNotification,
 } from '@/lib/notifications/messageTemplates'
+import { hasThreadMarker, splitThreadPosts } from '@/lib/threadUtils'
 
 interface SubmitDialogProps {
   open: boolean
@@ -126,6 +127,13 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
     try {
       // Build tags array, including title, summary, and cover image if present
       const tags = [...draft.tags]
+      const contentPosts = splitThreadPosts(draft.content)
+      const isThreadSubmission = draft.targetKind === 1 && (
+        hasThreadMarker(tags) || contentPosts.length > 1
+      )
+      if (isThreadSubmission && !hasThreadMarker(tags)) {
+        tags.push(['ghostr-thread', 'true'])
+      }
       if (draft.targetKind === 30023) {
         // Add title tag (NIP-23 requires it)
         if (draft.title?.trim()) {
@@ -150,6 +158,10 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
         ? draft.content.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
         : draft.content
 
+      const threadPosts = isThreadSubmission
+        ? contentPosts
+        : undefined
+
       const payload: SubmissionPayload = {
         protocol: PROTOCOL_VERSION,
         type: 'submission',
@@ -157,6 +169,7 @@ export function SubmitDialog({ open, onOpenChange, draft }: SubmitDialogProps) {
         content: normalizedContent,
         kind: draft.targetKind,
         tags,
+        threadPosts,
         note: note.trim(),
         submittedAt: Math.floor(Date.now() / 1000), // Actual submission time
       }

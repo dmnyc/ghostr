@@ -23,6 +23,7 @@ import { toast } from '@/hooks/useToast'
 import { PROTOCOL_VERSION } from '@/lib/constants'
 import { sendBotNotification } from '@/lib/nostr/nip04'
 import { createApprovalNotification } from '@/lib/notifications/messageTemplates'
+import { hasThreadMarker, splitThreadPosts, stripThreadMarker } from '@/lib/threadUtils'
 
 interface PublishDialogProps {
   open: boolean
@@ -54,7 +55,15 @@ export function PublishDialog({
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [includeCredit, setIncludeCredit] = useState(creditGhostr)
+  const [publishingPostIndex, setPublishingPostIndex] = useState<number | null>(null)
 
+  const hasThreadTag = hasThreadMarker(submission.tags)
+  const payloadThreadPosts = submission.threadPosts?.map((post) => post.trim()).filter(Boolean) ?? []
+  const contentThreadPosts = splitThreadPosts(editedContent)
+  const isThreadSubmission = submission.kind === 1 && (hasThreadTag || payloadThreadPosts.length > 1 || contentThreadPosts.length > 1)
+  const dialogThreadPosts = isThreadSubmission
+    ? (contentThreadPosts.length > 1 ? contentThreadPosts : payloadThreadPosts)
+    : []
   const handlePublish = async () => {
     if (!ndk || !signer) {
       setError('Not connected or authenticated')
@@ -69,8 +78,89 @@ export function PublishDialog({
 
     setIsPublishing(true)
     setError(null)
+    setPublishingPostIndex(null)
+    let threadPublishedIds: string[] = []
+    let threadPostCount = 0
 
     try {
+      const isThread = isThreadSubmission
+      const editedThreadPosts = isThread ? dialogThreadPosts : []
+      threadPostCount = editedThreadPosts.length
+
+      if (isThread && submission.kind === 1) {
+        if (editedThreadPosts.length < 2) {
+          setError('Threads need at least two non-empty posts before publishing')
+          setIsPublishing(false)
+          return
+        }
+        const publishedIds: string[] = []
+        threadPublishedIds = publishedIds
+        let publisherPubkey: string | undefined
+        for (const [index, postContent] of editedThreadPosts.entries()) {
+          setPublishingPostIndex(index)
+          const threadEvent = new NDKEvent(ndk)
+          threadEvent.kind = 1
+          threadEvent.content = postContent
+          const tags: string[][] = stripThreadMarker(submission.tags)
+          if (includeCredit) {
+            tags.push(['client', 'Ghostr'])
+          }
+          if (index > 0) {
+            const rootId = publishedIds[0]
+            const replyId = publishedIds[publishedIds.length - 1]
+            if (!rootId || !replyId) throw new Error('Missing thread root or reply event id')
+            tags.push(['e', rootId, '', 'root'])
+            tags.push(['e', replyId, '', 'reply'])
+            if (publisherPubkey) {
+              tags.push(['p', publisherPubkey])
+            }
+          }
+          threadEvent.tags = tags
+          await threadEvent.sign(signer)
+          publisherPubkey = publisherPubkey || threadEvent.pubkey
+          await threadEvent.publish()
+          publishedIds.push(threadEvent.id)
+        }
+
+        const rootEventId = publishedIds[0]
+        if (!rootEventId) throw new Error('No thread posts were published')
+        try {
+          const receipt: ReceiptPayload = {
+            protocol: PROTOCOL_VERSION,
+            type: 'receipt',
+            submissionId: submission.id,
+            action: 'approved',
+            eventId: rootEventId,
+            timestamp: Date.now(),
+          }
+          await sendGiftWrappedReceipt(submission.delegatePubkey, receipt)
+        } catch (receiptError) {
+          console.error('Failed to send receipt:', receiptError)
+        }
+
+        markAsApproved(submission.id, rootEventId)
+        publishedIds.forEach((eventId, index) => {
+          addItem({
+            id: eventId,
+            content: editedThreadPosts[index] || '',
+            kind: 1,
+            publishedAt: Date.now(),
+            source: 'delegate',
+            delegatePubkey: submission.delegatePubkey,
+            delegateNpub: submission.delegateNpub,
+          })
+        })
+
+        toast({
+          title: 'Thread published successfully',
+          description: `${publishedIds.length} posts have been published as a thread.`,
+        })
+
+        onOpenChange(false)
+        onSuccess()
+        return
+      }
+
       // Normalize line breaks for markdown: convert single \n to \n\n for proper paragraph breaks
       const normalizedContent = editedContent.replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
 
@@ -190,9 +280,15 @@ export function PublishDialog({
       onSuccess()
     } catch (err) {
       console.error('Failed to publish:', err)
-      setError(err instanceof Error ? err.message : 'Failed to publish')
+      const baseMessage = err instanceof Error ? err.message : 'Failed to publish'
+      if (threadPostCount > 0 && threadPublishedIds.length > 0 && threadPublishedIds.length < threadPostCount) {
+        setError(`${threadPublishedIds.length} of ${threadPostCount} posts went live before the error — posts 1 through ${threadPublishedIds.length} are already published. ${baseMessage}`)
+      } else {
+        setError(baseMessage)
+      }
     } finally {
       setIsPublishing(false)
+      setPublishingPostIndex(null)
     }
   }
 
@@ -200,29 +296,37 @@ export function PublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publish Content</DialogTitle>
+          <DialogTitle>{isThreadSubmission ? 'Publish Thread' : 'Publish Content'}</DialogTitle>
           <DialogDescription>
-            This will create a new event signed with your key and publish it to your relays.
+            {isThreadSubmission
+              ? 'This will publish each thread post sequentially with root/reply tags, signed with your key.'
+              : 'This will create a new event signed with your key and publish it to your relays.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="rounded-lg bg-muted p-4 space-y-2">
+          <div className="rounded-lg bg-muted p-4 space-y-3">
             <h4 className="font-medium text-sm">Event Preview</h4>
             <div className="text-xs space-y-1">
               <div>
                 <span className="text-muted-foreground">Kind:</span>{' '}
-                {submission.kind}
-              </div>
-              <div>
-                <span className="text-muted-foreground">Content length:</span>{' '}
-                {editedContent.length} characters
+                {isThreadSubmission ? `${dialogThreadPosts.length} thread posts` : submission.kind}
               </div>
               <div>
                 <span className="text-muted-foreground">Tags:</span>{' '}
-                {submission.tags.length} tag(s)
+                {stripThreadMarker(submission.tags).length} public tag(s)
               </div>
             </div>
+            {isThreadSubmission && (
+              <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                {dialogThreadPosts.map((post, index) => (
+                  <div key={index} className="rounded-md border bg-background p-3 text-xs space-y-1">
+                    <div className="font-medium">Post {index + 1}</div>
+                    <p className="whitespace-pre-wrap text-muted-foreground line-clamp-3">{post}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="text-sm text-muted-foreground">
@@ -258,7 +362,13 @@ export function PublishDialog({
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}
-              {isPublishing ? 'Publishing...' : 'Publish to Nostr'}
+              {isPublishing
+                ? (isThreadSubmission && publishingPostIndex !== null
+                  ? `Publishing post ${publishingPostIndex + 1} of ${dialogThreadPosts.length}…`
+                  : 'Publishing...')
+                : isThreadSubmission
+                  ? `Publish ${dialogThreadPosts.length} posts`
+                  : 'Publish to Nostr'}
             </Button>
           </div>
         </DialogFooter>

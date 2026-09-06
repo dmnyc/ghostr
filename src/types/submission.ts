@@ -5,6 +5,7 @@ export interface SubmissionPayload {
   content: string
   kind: 1 | 30023
   tags: string[][]
+  threadPosts?: string[]
   note: string
   submittedAt?: number // Unix timestamp in seconds when submitted (added for accurate timestamps)
 }
@@ -23,6 +24,7 @@ export interface Submission {
   content: string
   kind: 1 | 30023
   tags: string[][]
+  threadPosts?: string[]
   note: string
   receivedAt: number
   status: 'pending' | 'approved' | 'rejected' | 'archived'

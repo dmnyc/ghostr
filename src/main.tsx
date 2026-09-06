@@ -6,6 +6,7 @@ import App from "./App";
 import { initializeBotSigner } from "@/lib/ndk/botSigner";
 import { initializeKeychatShim } from "@/lib/keychatShim";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 // Initialize keychat shim and bot signer before React render
 console.log("[Ghostr] Starting initialization...");
@@ -21,10 +22,12 @@ console.log("[Ghostr] Initialization complete, rendering React...");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryProvider>
+    <ErrorBoundary>
+      <QueryProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
